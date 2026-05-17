@@ -38,6 +38,7 @@ int32 CmdLine::do_init() {
     std::string visibility;
     cm::print("Repo visibility — enter 'public' or 'private' [private]: ");
     cm::prompt(visibility);
+    cm::print("\n");
 
     if (visibility.empty() || visibility == "private") {
         visibility = "private";
@@ -47,9 +48,9 @@ int32 CmdLine::do_init() {
         cm::terminate("Invalid visibility '{}'. Must be 'public' or 'private'.\n", visibility);
     }
 
-    fs::path repo_d = cm::parsePathTilde(dotty.config_d);
+    fs::path repo_d = cm::parsePathTilde(dotty.storage_d/dotty.currentProfile());
 
-    cm::print("\nInitializing dotty config directory at {}...\n", repo_d.string());
+    cm::print("\nInitializing dotty config directory at ", repo_d.string(), "...\n\n");
 
     if (!fs::exists(repo_d)) {
         if (!fs::create_directories(repo_d))
@@ -58,21 +59,26 @@ int32 CmdLine::do_init() {
 
     cm::CmdStream cmd;
     cmd
-        .add("git -C {} init", repo_d.string())
+        .add("cd {}", repo_d.string())
+        .add("git add .")
+        .add("git commit -m 'Dotty profile repository: Initial commit'")
+        .add("git init")
         .add("gh repo create {} --{} --source={} --remote=origin --push",
             repo_name, visibility, repo_d.string());
-    cmd.run();
+    cmd.run(" && ");
 
-    cm::print("\nDotty initialized! Repo '{}' created as {} on GitHub.\n", repo_name, visibility);
+    cm::print("Repo '", repo_name, "' created as ", visibility, " on GitHub.\n");
     return EXIT_SUCCESS;
 }
 
 
 int32 CmdLine::do_write() {
-    Cfman cfman;
     Lexer lexer;
     ConfigParser parser;
-    std::ifstream conf(cm::parsePathTilde(cfman.config), std::ios::in);
+    std::ifstream conf(
+        cm::parsePathTilde(dotty.config_d/dotty.currentProfile()/dotty.config_source_name),
+        std::ios::in
+    );
     if (!conf.is_open()) cm::terminate("File could not be opened!\n");
 
     while (std::getline(conf, lexer.line)) {
@@ -82,10 +88,10 @@ int32 CmdLine::do_write() {
         parser.tokens = lexer.result();
         parser.parseMain();
         cm::print("Adding new values to the base...\n");
-        cfman.path_pairs = parser.result();
+        dotty.path_pairs = parser.result();
     }
     cm::print("\n\nCopying configs to their destinations...\n");
-    cfman.write();
+    dotty.write();
     cm::print("\n\nLexed tokens:\n");
     lexer.print();
 
@@ -100,7 +106,7 @@ int32 CmdLine::do_update(const char* commit_message) {
         .add("git commit {}", commit_message)
         .add("git push")
     ;
-    cmd.run();
+    cmd.run(" && ");
 
     return EXIT_SUCCESS;
 }
@@ -110,7 +116,7 @@ int32 CmdLine::do_install() {
     cmd
         .add("")
     ;
-    cmd.run();
+    cmd.run("; ");
 
     return EXIT_SUCCESS;
 }
@@ -128,7 +134,7 @@ void CmdLine::newSubCmd(const char* name, const std::function<int32()>& fn, cons
 int32 CmdLine::setup()
 {
     newSubCmd("init", BIND(do_init()), "Initialize dotty config manager in your system");
-    newSubCmd("update", BIND(do_write()), "Update configs to configs storage");
+    newSubCmd("write", BIND(do_write()), "Update configs to configs storage");
 
     CLI11_PARSE(impl->cli, impl->argc, impl->argv);
     return EXIT_SUCCESS;

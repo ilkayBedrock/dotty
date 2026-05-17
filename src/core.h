@@ -22,10 +22,12 @@ struct CmdStream {
         commands.clear();
     }
 
-    void run() {
-        for (auto& cmd : commands) {
-            std::system(cmd.data());
+    int32 run(const char* seperator) {
+        std::string line = {};
+        for (uint32 i=0;  i < commands.size();  ++i) {
+            line = commands[i] += ((i!=commands.size()-1)? seperator:"");
         }
+        return std::system(line.data());
     }
 };
 
@@ -59,9 +61,18 @@ template <int _errc=1, class... Args>
 
 
 
-const char* concats(const char* base, const char* append) {
-    static const char* res = std::string(base).append(append).data();
-    return res;
+template <class T>
+bool is_any_of(const T val, std::initializer_list<T> list) {
+    for (auto item : list) {
+        if (val == list) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline std::string concats(const char* base, const char* append) {
+    return std::string(base).append(append);
 }
 
 template <class T>

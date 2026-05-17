@@ -1,17 +1,21 @@
 #pragma once
 #include "core.h"
 
+
+struct Profile;
+
 struct Cfman
 {
-    const fs::path user_home = cm::userHomePath(true, "$HOME is empty");
-    const fs::path master_config = "~/dotty.toml";
+    std::vector<const Profile*> profiles;
 
+    const fs::path HOME = cm::userHomePath(true, "$HOME is empty");
     fs::path config_d = "~/.config/dotty";
-    fs::path profile_name = "main";
-    const char* config_source_name = "config";
-    fs::path config = config_d/profile_name/config_source_name;
-
     fs::path storage_d = "~/.local/share/dotty";
+
+    const char* master_config = "dotty.toml";
+    const char* config_source_name = "config";
+    const char* default_profile = "main";
+    const char* current_profile = default_profile;
 
     using SrcDest = struct{ fs::path src, path; };
     std::vector<SrcDest> path_pairs = {};
@@ -29,7 +33,7 @@ struct Cfman
     // Get current profile as string
     [[gnu::pure]]
     std::string currentProfile() {
-        std::string current = profile_name;
+        std::string current = current_profile;
         return current;
     }
 
@@ -48,20 +52,53 @@ struct Cfman
     // Set current dotty profile
     Res setProfile(const std::string& name) {
         if (!fs::exists(config_d/name)) return Res::ProfileDoesNotExist;
-        if (profile_name.string() == name) return Res::ProfileAlreadySet;
-        profile_name = name;
+        if (default_profile == name) return Res::ProfileAlreadySet;
+        default_profile = name.data();
         return Res::OK;
     }
 
     // Copy all source files to destination files, pairs defined by a member
     void write() {
         for (auto [src, dest] : path_pairs) {
-            fs::copy_file(cm::parsePathTilde(src), cm::parsePathTilde(dest), fs::copy_options::update_existing);
+            if (dest.is_absolute()) {
+                cm::print(
+                    "Config-Manager: Write: Error: destination should be relative path!\n"
+                ); continue;
+            }
+            fs::copy_file(
+                cm::parsePathTilde(src),
+                cm::parsePathTilde(storage_d/currentProfile())/dest,
+                fs::copy_options::update_existing
+            );
         }
     }
 };
 
-inline Cfman dotty;
+extern Cfman dotty;
+
+
+
+struct Profile {
+    std::string name;
+    std::string github_account;
+    std::string repo_url;
+
+    Profile(
+        const std::string& name, const std::string& github_account,
+        const std::string repo_url
+    ) : name(name), github_account(github_account), repo_url(repo_url)
+    {
+        dotty.profiles.push_back(this);
+    }
+
+    fs::path get_dir() {
+        return dotty.config_d/name;
+    }
+    fs::path get_config_path() {
+        return get_dir()/dotty.config_source_name;
+    }
+};
+
 
 
 struct Token {
@@ -280,11 +317,11 @@ struct MasterConfigParser {
                     cm::print("Master-Config: Profile does not exist: ", key);
                 }
                 const char* mentioned_profile = key.data();
-                if (cm::prefix_strip(key, MENTION_GH_ACC, &key)) {
+                if (cm::prefix_strip(key, "gh-acc", &key)) {
                     vars[PROP(mentioned_profile, MENTION_GH_ACC)] = second;
                 }
                 else if (cm::prefix_strip(key, MENTION_REPO_URL, &key)) {
-                    vars[PROP(mentioned_profile, MENTION_REPO_URL)] = second;
+                    vars[PROP(mentioned_profile, "repo-url")] = second;
                 }
             }
             else

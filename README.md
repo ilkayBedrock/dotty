@@ -1,4 +1,4 @@
-# CFMAN
+# DOTTY
 
 # DEPS
 git, github-cli
