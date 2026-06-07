@@ -82,7 +82,7 @@ The configuration file uses a simple mapping syntax:
 Example:
 ```
 "~/.bashrc" >> "shell/.bashrc"
-"~/.config/nvim/init.lua" >> "nvim/init.lua"
+"~/.config/nvim/init.lua" >> "nvim/" # delivers file name properly
 ```
 
 
@@ -116,6 +116,6 @@ This will parse your config file and update the files in `~/.local/share/dotty/<
 ## Primary project files
 
 - `src/main.cpp`: Entry point.
-- `src/core.h`: Common utility functions and stream wrappers.
-- `src/common.hpp`: Global definitions, types, and includes, it's compiled to a PCH via xmake.
+- `core/include/core.hpp`: Common utility functions and stream wrappers.
+- `include/common.hpp`: Global definitions, types, and includes, it's compiled to a PCH via xmake.
 

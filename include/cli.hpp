@@ -1,6 +1,9 @@
 #pragma once
 #include "cfman.hpp"
 
+namespace CLI { class App; }
+
+
 struct CmdLine
 {
     struct Impl;
@@ -23,7 +26,7 @@ struct CmdLine
 
     CLI::App* newSubCmd(
         CLI::App* parent, const char* name, const std::function<int32()>& fn, const char* desc,
-        int32 require_subcommands=0
+        bool profile_agnostic, int32 require_subcommands
     );
 
     int32 setup();

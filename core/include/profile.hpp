@@ -1,7 +1,7 @@
 #pragma once
-#include "core.h"
+#include "core.hpp"
 
-struct SrcDest { fs::path src, path; };
+struct SrcDest { fs::path src, dest; };
 
 struct Profile {
     std::string name;

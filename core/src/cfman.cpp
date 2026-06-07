@@ -51,16 +51,27 @@ Profile* Cfman::getProfileByName(const strview prof_name) {
 
 
 // Get current profile as string
-std::string Cfman::currentProfile() {
+std::string Cfman::activeProf() {
     std::string profile_name = current_profile.name;
     return profile_name;
 }
 
 
 Report Cfman::prerequisite(strview init_prof) {
-    $IMPLEMENT(__PRETTY_FUNCTION__);
-    return Report::Bad("");
+    Profile* profile = getProfileByName(activeProf());
+
+    if (dotty.activeProf() == NO_PROFILE) {
+        Report::Bad("Active profile is not set!\n");
+    }
+
+    // Pre-create required directories
+    cm::ensure_directory(config_d/profile->name);
+    cm::ensure_directory(data_d/profile->name);
+    cm::ensure_directory(data_d/profile->name/dotty.data_cfgref);
+
+    return Report::Good();
 }
+
 
 
 // Create a folder and register a new profile
@@ -84,7 +95,7 @@ Report Cfman::newProfile(
 
     cm::CmdStream cmd;
     cmd
-        .add("mkdir -p {0}/{1} && cd {0}", repo_d.string(), storage_cfgref)
+        .add("mkdir -p {0}/{1} && cd {0}", repo_d.string(), data_cfgref)
         .add("git init")
         .add("touch .gitkeep")
         .add("git add .gitkeep")
@@ -107,38 +118,46 @@ Report Cfman::newProfile(
 }
 
 
-Report Cfman::deleteProfile(const strview profile_name) {
-    // read(in_master), modify and write(out_master) back
-    std::ifstream in_master(HOME/master_src, std::ios::in);
-    std::ofstream out_master(HOME/master_src, std::ios::trunc);
 
-    if (!in_master || !out_master) return Report::Bad("Could not open master config");
+Report Cfman::deleteProfile(const strview profile_name) {
+    if (!profileExists(profile_name)) {
+        return Report::Bad("Can't delete '{}', it doesn't exist!", profile_name);
+    } else if (activeProf() == profile_name) {
+        return Report::Bad("Can't delete active profile! Switch to another profile to delete '{}'", profile_name);
+    }
+
+    // read(in_master), modify and write(out_master) back
+    std::ifstream master_old(HOME/master_src, std::ios::in);
+    std::ofstream master_new(HOME/master_src, std::ios::trunc);
+
+    if (!master_old || !master_new) return Report::Bad("Could not open master config");
 
     // load contents of master config to this string and close ifstream
-    std::string master_content = {std::istreambuf_iterator(in_master), {}};
-    in_master.close();
+    std::string master_content = {std::istreambuf_iterator(master_old), {}};
+    master_old.close();
 
     std::string adder = "profile.add = \"" + std::string(profile_name) + "\"";
     std::string activator = "profile.active = \"" + std::string(profile_name) + "\"";
     std::string mention = "@" + std::string(profile_name);
 
-    std::istringstream master_old(master_content);
-    std::ostringstream master_new;
+    std::istringstream master_data_old(master_content);
+    std::ostringstream master_data_new;
     std::string line;
 
-    while (std::getline(master_old, line))
+    while (std::getline(master_data_old, line))
     {
         if (line.contains(adder)) continue;
         if (line.contains(activator)) continue;
         if (line.contains(mention)) continue;
 
-        master_new << line << "\n";
+        master_data_new << line << "\n";
     }
 
     // write back
-    out_master << master_new.str();
+    master_new << master_data_new.str();
     return Report::Good();
 }
+
 
 
 // Set current dotty profile
@@ -150,9 +169,16 @@ Report Cfman::setActiveProfile(const std::string& name) {
         return Report::Bad("Can't @{} active: Profile doesn't exist!", name);
     }
     if (current_profile.name == name.data()) {
-        return Report::Bad("profile @{} is already active", name);
+        // return Report::Bad("profile @{} is already active", name);
+        return Report::Good();
     }
-    current_profile.name = name.data();
+
+    std::ifstream in_master(dotty.HOME/dotty.master_src);
+    std::ifstream out_master(dotty.HOME/dotty.master_src);
+    if (!in_master || !out_master) Report::Bad("Couldn't open master config.");
+    std::string master_data = {std::istreambuf_iterator<char>(in_master), {}};
+    
+
     return Report::Good();
 }
 
@@ -195,24 +221,24 @@ Report Cfman::cleanConfigs(bool config, bool storage) {
     if (noProfilesExist()) {
         return Report::Bad("Can't clean profile configs: No profiles exist");
     }
-    else if (currentProfile() == NO_PROFILE) {
+    else if (activeProf() == NO_PROFILE) {
         return Report::Bad("Can't clean profile configs: No profiles are active");
     }
 
     if (config) {
-        target_path = config_d/currentProfile();
+        target_path = config_d/activeProf();
         if (fs::exists(target_path)) {
             cm::print(":: Cleaning profile configs: ", target_path.string());
             cm::remove_dir_contents_recursive(target_path, {config_src});
             // clear config file
-            std::ofstream master_cfg(config_d/currentProfile()/config_src, std::ios::out);
+            std::ofstream master_cfg(config_d/activeProf()/config_src, std::ios::out);
         } else {
             report.addComplain("Path does not exist: {}", target_path.string());
         }
     }
 
     if (storage) {
-        target_path = data_d/currentProfile();
+        target_path = data_d/activeProf();
         if (fs::exists(target_path)) {
             cm::print(":: Removing config storage contents: ", target_path.string());
             std::pair ratio = cm::remove_dir_contents_recursive(target_path);
@@ -268,12 +294,14 @@ void Cfman::load(bool optimistic) {
         setActiveProfile(it->second.data()).printOnBad();
     } else if (!optimistic) cm::terminate("dotty.load: setProfile(it->second): Error!");
 
+    std::string profile = activeProf();
+
     cm::debug("Loaded dotty.\n\n");
 }
 
 
 // Copy all source files to destination files, pairs defined by a member
-void Cfman::SourceToStorage() {
+void Cfman::configToStorage() {
     for (auto [src, dest] : path_pairs) {
         if (dest.is_absolute()) {
             cm::print(
@@ -284,7 +312,7 @@ void Cfman::SourceToStorage() {
 
         auto src_path = cm::parsePathTilde(src);
 
-        auto dest_path = cm::parsePathTilde(data_d/currentProfile())/dest;
+        auto dest_path = cm::parsePathTilde(data_d/activeProf())/dest;
         // NOTE: Add an explanation here
         if (dest_path.string().back() == '/') {
             cm::debug("Converting '", dest_path.string(), "' to '",
@@ -296,32 +324,29 @@ void Cfman::SourceToStorage() {
         // create missing and copy src->dest
         fs::create_directories(dest_path.parent_path());
         fs::copy_file(
-            cm::parsePathTilde(src_path),
-            cm::parsePathTilde(dest_path),
+            src_path, dest_path,
             fs::copy_options::update_existing
         );
     }
 }
 
 
-void Cfman::StorageToSources() {
+void Cfman::storageToSystem() {
     for (auto [dest, src] : path_pairs) {
-        if (dest.is_absolute()) {
+        if (src.is_absolute()) {
             cm::print(
                 __PRETTY_FUNCTION__+5, ": Error: destination should be relative path!",
                 "skipping..\n"
             ); continue;
         }
 
-        auto dest_path = cm::parsePathTilde(data_d/currentProfile())/dest;
-        auto src_path = cm::parsePathTilde(src);
-        cm::debug("salamm!");
+        auto src_path = cm::parsePathTilde(data_d)/activeProf()/src;
+        auto dest_path = cm::parsePathTilde(dest);
 
-        fs::create_directories(dest_path.parent_path());
+        cm::ensure_directory(dest_path.parent_path());
         fs::copy_file(
-            cm::parsePathTilde(dest_path),
-            cm::parsePathTilde(src_path),
-            fs::copy_options::update_existing
+            src_path, dest_path,
+            fs::copy_options::overwrite_existing
         );
     }
 }

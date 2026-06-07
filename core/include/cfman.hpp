@@ -13,7 +13,7 @@ struct Cfman
 
     const char* master_src = ".dotty";
     const char* config_src = "config";
-    const char* storage_cfgref = ".dotty.d";
+    const char* data_cfgref = ".dotty.d";
     Profile current_profile = Profile{NO_PROFILE, "", "", false};
 
     std::vector<SrcDest> path_pairs = {};
@@ -34,7 +34,7 @@ struct Cfman
     bool noProfilesExist();
     bool profileExists(const strview profile_name);
     Profile* getProfileByName(const strview prof_name);
-    std::string currentProfile();
+    std::string activeProf();
     Report prerequisite(strview init_prof);
     Report newProfile(const std::string& name, const std::string& github_name,
         const std::string& repo_name, const std::string& repo_visibility
@@ -45,8 +45,8 @@ struct Cfman
     Report cleanConfigs(bool config, bool storage);
     bool detectPreinitConfig();
     void load(bool optimistic = false);
-    void SourceToStorage();
-    void StorageToSources();
+    void configToStorage();
+    void storageToSystem();
 };
 
 extern Cfman dotty;

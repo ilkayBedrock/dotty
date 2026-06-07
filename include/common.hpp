@@ -1,4 +1,5 @@
 #pragma once
+// NOTE: this file is a PCH (pre-compiled header)!
 #include <iostream>
 #include <vector>
 #include <map>
@@ -12,14 +13,13 @@
 #include <cstdio>
 #include <cstring>
 // 3rd party
-#include <CLI/CLI.hpp>
 #include <readline/readline.h>
 
 #define NAMESPACE_START(_name) namespace _name {
 #define NAMESPACE_END(_name) }
 #define COMPTIME_STR constexpr const char* const
 // use it only for integers, bool(true) is success
-#define FAILED (1)==
+#define FAILED (0)!=
 
 #if defined(__linux__) || defined(__APPLE__)
 #       define OS_NEWLN '\n'

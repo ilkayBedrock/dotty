@@ -8,6 +8,15 @@ compile_commands.json
 # MacOS Cache
 .DS_Store
 
-# REST
+# Binaries
+*.bin
+*.out
+*.exe
+*.a
+*.o
+*.so
+*.dylib
+
+# Explicit
 dotty
 PLAN.md

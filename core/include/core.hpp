@@ -2,11 +2,11 @@
 #include "common.hpp"
 
 #ifndef DEBUG_ON
-#   define DEBUG_ON (true)
+#   define DEBUG_ON (0)
 #endif
 
 #ifndef PRINT_ON
-#   define PRINT_ON (true)
+#   define PRINT_ON (1)
 #endif
 
 
@@ -90,7 +90,7 @@ inline bool ask_confirm(const strview message, bool default_yes = true) {
     free(inp);
 
     if (polish.empty()) return default_yes;
-    if (std::tolower(polish[0]) == 'y') return default_yes;
+    if (std::tolower(polish[0]) == 'y') return true;
     return(false);
 }
 
