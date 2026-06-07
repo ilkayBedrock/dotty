@@ -141,11 +141,11 @@ int32 CmdLine::do_push(const char* commit_message) {
         return EXIT_FAILURE;
     }
 
-    cm::ensure_directory(dotty.config_d / dotty.activeProf() / dotty.data_cfgref);
+    cm::ensure_directory(dotty.config_d / dotty.activeProf());
     cm::ensure_directory(dotty.data_d / dotty.activeProf() / dotty.data_cfgref);
     // Copy all config source and includes to local repo(config storage) before push
     fs::copy(
-        dotty.config_d / dotty.activeProf() / dotty.data_cfgref,
+        dotty.config_d / dotty.activeProf(),
         dotty.data_d / dotty.activeProf() / dotty.data_cfgref,
         fs::copy_options::recursive | fs::copy_options::overwrite_existing
     );
@@ -228,7 +228,7 @@ int32 CmdLine::do_config(strview option) {
         }
         else {
             return cm::CmdStream{}
-                .add("$EDITOR {}", cfg_path.c_str())
+                .add("VISUAL=\"$EDITOR\" $EDITOR {}", cfg_path.c_str())
                 .run(" && ", false);
         }
     };
@@ -351,5 +351,15 @@ int32 CmdLine::do_p_delete(strview profile_name) {
 
     dotty.deleteProfile(profile_name).printOnBad();
 
+    return EXIT_SUCCESS;
+}
+
+
+int32 CmdLine::do_p_switch(const std::string& profile_name) {
+    Report fault = dotty.setActiveProfile(profile_name);
+    if (fault) {
+        fault.printOnBad();
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

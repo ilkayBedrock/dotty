@@ -104,6 +104,9 @@ template <int _errc=1, class... Args>
 
 
 
+inline bool is_even(int32 x) {
+    return (x & 1) == 0;
+}
 
 template <class T>
 bool is_any_of(const T val, std::initializer_list<T> list) {
@@ -321,7 +324,7 @@ struct cm::Report {
 
     void terminateOnBad() {
         if (bool(*this)) {
-            cm::terminate("terminated by Report::terminateOnBad()");
+            cm::terminate("Reported bad behaviour: this->", __func__, "");
         }
     }
 };
@@ -385,5 +388,3 @@ public:
         return std::move(output_buf);
     }
 };
-
-

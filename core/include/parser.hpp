@@ -20,6 +20,7 @@ struct Lexer {
     std::string line;
     uint32 pos;
     std::vector<Token> tokens;
+    static constexpr char CMNT = '#';
 
     char get() { return line[pos]; }
     bool checks() { return line.size() > pos; }
@@ -76,6 +77,26 @@ struct Lexer {
         return "=";
     }
 
+    [[nodiscard]]
+    static std::string RemoveComment(std::string line) {
+        std::vector<int32> quotes;
+        quotes.reserve(128);
+
+        for (uint32 i=0;  i < line.size();  ++i) {
+            if (line[i] == '\'') {
+                quotes.push_back(i);
+            }
+
+            if (cm::is_even(quotes.size())) {
+                if (line[i] == CMNT) {
+                    return line.substr(0, i);
+                }
+            }
+        }
+
+        return line;
+    }
+
     void print() {
         for (uint32 i=0;  i < tokens.size();  ++i) {
             cm::print((char)tokens[i].type, " : ", tokens[i].name, "\n");
@@ -89,6 +110,7 @@ struct Lexer {
 
         while(checks())
         {
+            line = RemoveComment(line);
             skipws();
 
             if (get() == '"') {
@@ -217,14 +239,14 @@ struct MasterConfigParser {
                 }
             }
             else if (!cm::obj_prop(left).first.empty()) {
-                const char* mentioned  = cm::obj_prop(left).first.c_str();
+                std::string mentioned  = cm::obj_prop(left).first;
                 const std::string prop  = cm::obj_prop(left).second;
                 ;
                 if (prop == MENTION_GH_ACC) {
-                    vars[PROP(mentioned, MENTION_GH_ACC)] = second;
+                    vars[PROP(mentioned.c_str(), MENTION_GH_ACC)] = second;
                 }
                 else if (prop == MENTION_REPO_URL) {
-                    vars[PROP(mentioned, MENTION_REPO_URL)] = second;
+                    vars[PROP(mentioned.c_str(), MENTION_REPO_URL)] = second;
                 }
             }
             else

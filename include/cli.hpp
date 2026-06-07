@@ -1,4 +1,4 @@
-#pragma once
+#pragma oncel
 #include "cfman.hpp"
 
 namespace CLI { class App; }
@@ -23,9 +23,10 @@ struct CmdLine
         int32 do_p_list(const strview options);
         int32 do_p_new(const std::string& name, const std::string& repo_name, const std::string& visibility);
         int32 do_p_delete(strview options);
+        int32 do_p_switch(const std::string& profile_name);
 
     CLI::App* newSubCmd(
-        CLI::App* parent, const char* name, const std::function<int32()>& fn, const char* desc,
+        CLI::App* parent, std::initializer_list<const char*> names, const std::function<int32()>& fn, const char* desc,
         bool profile_agnostic, int32 require_subcommands
     );
 

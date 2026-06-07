@@ -98,7 +98,7 @@ dotty update
 This will parse your config file and update the files in `~/.local/share/dotty/<profile-name>` based on the mappings.
 
 
-## Development Conventions
+## Development
 
 
 ### Header Files
@@ -119,3 +119,7 @@ This will parse your config file and update the files in `~/.local/share/dotty/<
 - `core/include/core.hpp`: Common utility functions and stream wrappers.
 - `include/common.hpp`: Global definitions, types, and includes, it's compiled to a PCH via xmake.
 
+
+### License
+
+This project is licensed under the GNU General Public License v3.0. For the full text of the license and terms of use, please refer to the [LICENSE](LICENSE) file.

@@ -13,7 +13,6 @@ add_requires("cli11", {system = true})
 add_requires("readline", {system = true})
 
 
-
 if is_mode("release") then
     add_defines("DEBUG_ON=0")
     set_strip("all")

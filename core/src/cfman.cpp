@@ -133,14 +133,13 @@ Report Cfman::deleteProfile(const strview profile_name) {
     if (!master_old || !master_new) return Report::Bad("Could not open master config");
 
     // load contents of master config to this string and close ifstream
-    std::string master_content = {std::istreambuf_iterator(master_old), {}};
     master_old.close();
 
     std::string adder = "profile.add = \"" + std::string(profile_name) + "\"";
     std::string activator = "profile.active = \"" + std::string(profile_name) + "\"";
     std::string mention = "@" + std::string(profile_name);
 
-    std::istringstream master_data_old(master_content);
+    std::istringstream master_data_old(std::string{std::istreambuf_iterator(master_old), {}});
     std::ostringstream master_data_new;
     std::string line;
 
@@ -166,19 +165,37 @@ Report Cfman::setActiveProfile(const std::string& name) {
         return Report::Bad("Can't set active profile: No profiles exist yet!");
     }
     if (!profileExists(name)) {
-        return Report::Bad("Can't @{} active: Profile doesn't exist!", name);
+        return Report::Bad("Can't switch to @{}: Profile doesn't exist!", name);
     }
-    if (current_profile.name == name.data()) {
+    if (current_profile.name == name.c_str()) {
         // return Report::Bad("profile @{} is already active", name);
         return Report::Good();
     }
 
-    std::ifstream in_master(dotty.HOME/dotty.master_src);
-    std::ifstream out_master(dotty.HOME/dotty.master_src);
-    if (!in_master || !out_master) Report::Bad("Couldn't open master config.");
-    std::string master_data = {std::istreambuf_iterator<char>(in_master), {}};
-    
+    // open master-config, read to string var, close master-config
+    std::ifstream master_old(dotty.HOME/dotty.master_src, std::ios::in);
+    if (!master_old) return Report::Bad("Couldn't open(write) master config, setting active profile aborted!");
+    std::istringstream master_content(std::string{std::istreambuf_iterator(master_old), {}});
+    master_old.close();
 
+    // open master-config, write new config
+    std::ofstream master_new(dotty.HOME/dotty.master_src, std::ios::out);
+    if (!master_new) return Report::Bad("Couldn't open(write) master config, setting active profile aborted!");
+    std::string line;
+
+    while (std::getline(master_content, line)) {
+        if (Lexer::RemoveComment(line).contains("profile.active")) {
+            continue;
+        }
+        master_new << line << "\n";
+    }
+
+    master_new << "\n\n";
+    master_new << "profile.active = \"" << name << "\"\n";
+    master_new << "\n\n";
+
+    Profile* found = getProfileByName(name);
+    current_profile = *found;
     return Report::Good();
 }
 
