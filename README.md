@@ -125,15 +125,14 @@ dotty config
 ```
 
 
-# My Development Preferences and C++ conventions
+### My Development Preferences and C++ conventions
 
-### Symbols & Tokens
 - **Variables/Constants/Members**: `snake_case`
 - **Functions/Methods**: `camelCase`
 - **Classes/Typedefs**: `PascalCase`
 - **Macros / Constexprs**: `UPPER_SNAKE_CASE`
 
-## Primary project files
+### Primary project files
 
 - `src/main.cpp`: Entry point.
 - `core/include/core.hpp`: Common utility functions and stream wrappers.
