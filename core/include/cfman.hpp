@@ -37,7 +37,8 @@ struct Cfman
     std::string activeProf();
     Report prerequisite(strview init_prof);
     Report newProfile(const std::string& name, const std::string& github_name,
-        const std::string& repo_name, const std::string& repo_visibility
+        const std::string& repo_name, const std::string& repo_visibility,
+        const char* const initial_commit_message
     );
     Report deleteProfile(const strview profile_name);
     Report setActiveProfile(const std::string& name);

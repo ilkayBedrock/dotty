@@ -1,4 +1,5 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Wignored-attributes"
 #include "common.hpp"
 
 #ifndef DEBUG_ON
@@ -38,7 +39,7 @@ void debug(Args... args) {
 }
 
 
-// uses std::istream
+// uses std::cin or readline()
 template <bool no_ansi_esc_seq=true, class T>
 inline T& prompt(const char* prompt, T& lval) {
     // Read input relevantly
@@ -46,7 +47,7 @@ inline T& prompt(const char* prompt, T& lval) {
     {
         if constexpr (no_ansi_esc_seq) {
             print(prompt);
-            $IMPLEMENT("cm::prompt: no-ansi-esc-seq for arithmetics");
+            $IMPLEMENT("no-ansi-esc-seq for arithmetics");
         }
         else {
             print(prompt);
@@ -168,7 +169,7 @@ inline bool new_file(const fs::path& path) {
 }
 
 // creates directory if doesnt exist, else no-op
-inline void ensure_directory(fs::path dir_path) {
+inline void ensure_directories(fs::path dir_path) {
     fs::create_directories(dir_path);
 }
 
@@ -289,20 +290,21 @@ NAMESPACE_END(cm)
 
 
 // contains error message and an error code
-struct cm::Report {
+struct [[nodiscard]] cm::Report {
     bool err = false;
     std::string msg = {};
 
+    [[nodiscard]]
     static Report Good() {
         return Report {false, ""};
     }
 
-    template <class... FmtArgs>
+    template <class... FmtArgs> [[nodiscard]]
     static Report Bad(std::format_string<FmtArgs...> err_msg, FmtArgs&&... err_msg_args) {
         return Report {true, std::format(err_msg, std::forward<FmtArgs>(err_msg_args)...)};
     }
 
-    operator bool () const {
+    constexpr inline operator bool () const {
         return err;
     }
 
@@ -316,7 +318,7 @@ struct cm::Report {
 
     template <class... FmtArgs>
     void addComplain(std::format_string<FmtArgs...> complain_msg, FmtArgs&&... complain_args) {
-        std::string complain = auto("\n") + std::format(
+        std::string complain = "\n" + std::format(
             complain_msg, std::forward<FmtArgs>(complain_args)...
         );
         msg.append(complain);

@@ -29,7 +29,7 @@
 
 inline std::vector<std::string> unimplemented;
 // bad yes, but i need highlight for better notice(GCC/Clang specific! who cares MSVC tho)
-#define $IMPLEMENT(_feature) (unimplemented.push_back(_feature), "")
+#define $IMPLEMENT(_feature) (unimplemented.push_back(std::string(std::string(__func__)+": ")+_feature), (void)"")
 #define $PRINT_UNIMPLEMENTED_FEATURES() \
     do{if(unimplemented.size())std::cerr<<"\033[33mUNIMPLEMENTED:\n"; \
         for(auto f:unimplemented)std::cerr<<f<<"\n" \

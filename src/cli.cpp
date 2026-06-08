@@ -24,6 +24,7 @@ struct CmdLine::Impl {
         std::string new_prof_name;
             std::string new_repo_name;
             std::string new_repo_visb;
+            std::string new_commit_msg;
         std::string delete_profile;
         std::string switch_profile;
     } v;
@@ -42,24 +43,27 @@ CmdLine::~CmdLine() {delete impl;}
 
 
 CLI::App* CmdLine::newSubCmd(
-    CLI::App* parent, const std::initializer_list<const char*> names, const std::function<int32()>& fn, const char* desc,
-    bool profile_agnostic, int32 require_subcommands
+    CLI::App* parent, const std::initializer_list<const char*> names, const std::function<int32()>& fn,
+    const char* desc, bool profile_agnostic, const int32 (&opt_min_max)[2], const int32 (&sc_min_max)[2]
 ) {
     if (names.size()>3 || names.size()<1) {
-        cm::terminate("", __func__, ": Should pass minimum 1 and maximum 3 names/aliases");
+        cm::terminate(
+            "", __func__, ": Should pass minimum 1 and maximum 3 names/aliases."
+        );
     }
 
     auto* sub_cmd = parent->add_subcommand(names.begin()[0], desc);
-    if (names.size() > 1) {
+    if (names.size()>1 && names.begin()[1]) {
         sub_cmd->alias(names.begin()[1]);
     }
-    if (names.size() > 2) {
+    if (names.size()>2 && names.begin()[2]) {
         sub_cmd->alias(names.begin()[2]);
     }
 
-    sub_cmd->require_subcommand(require_subcommands);
+    sub_cmd->require_option(opt_min_max[0], opt_min_max[1]);
+    sub_cmd->require_subcommand(sc_min_max[0], sc_min_max[1]);
 
-    impl->sub_commands.emplace(sub_cmd, fn);
+    impl->sub_commands.emplace(sub_cmd, CmdLine::Impl::CmdEntry{fn, profile_agnostic});
     return sub_cmd;
 }
 
@@ -70,40 +74,69 @@ int32 CmdLine::setup()
     using SubCmd = CLI::App;
 
     SubCmd* sc_init = newSubCmd(&APP, {"init"},
-        BIND(do_init()), "Initialize dotty config manager in your system", true, 0);
+        BIND(do_init()),
+        "Initialize dotty config manager in your system", true, {0,0}, {0,0}
+    );
     //
     SubCmd* sc_update = newSubCmd(&APP, {"update", "u"},
-        BIND(do_update()), "Write configs to configs storage", false, 0);
+        BIND(do_update()),
+        "Write configs to configs storage", false, {0,0}, {0,0}
+    );
     //
     SubCmd* sc_push = newSubCmd(&APP, {"push"},
-        BIND(do_push(impl->v.push_commit_msg.c_str())), "Push config storage to the github repo", false, 0);
-        sc_push->add_option("commit-message", impl->v.push_commit_msg, "Push with commit message")->required();
+        BIND(do_push(impl->v.push_commit_msg.c_str())),
+        "Push config storage to the github repo", false, {0,0}, {0,0}
+    ); sc_push
+        ->add_option("commit-message", impl->v.push_commit_msg, "Push with commit message")->required()
+    ;
     //
     SubCmd* sc_pull = newSubCmd(&APP, {"pull"},
-        BIND(do_pull()), "Pull your config from the repo", false, 0);
+        BIND(do_pull()),
+        "Pull your config from the repo", false, {0,0}, {0,0}
+    );
     //
     SubCmd* sc_config = newSubCmd(&APP, {"config", "c", "cfg"},
-        BIND(do_config(impl->v.config_)), "Configuration utilities", false, 0);
-        sc_config->add_option("configuration", impl->v.config_, "Configuire master");
+        BIND(do_config(impl->v.config_)),
+        "Configuration utilities",false, {0,0}, {0,0}
+    ); sc_config
+        ->add_option("configuration", impl->v.config_, "Configuire master")
+    ;
     //
     SubCmd* sc_profile_ = newSubCmd(&APP, {"profile", "p", "pro"},
-        BIND(do_profile_("")), "Profile related commands", true, 1);
+        BIND(do_profile_("")),
+        "Profile related commands", true, {0,0}, {1, 1}
+    );
     //
         SubCmd* ssc_list = newSubCmd(sc_profile_, {"list", "l", "ls"},
-            BIND(do_p_list(impl->v.list_properties)), "List all existing profiles", true, 0);
-            ssc_list->add_option("properties", impl->v.list_properties, "List profiles and opted properties")->default_val("name,url");
+            BIND(do_p_list(impl->v.list_properties)),
+            "List all existing profiles", true, {0,1}, {0,0}
+        ); ssc_list
+            ->add_option("properties", impl->v.list_properties, "List profiles and opted properties")->default_val("name,url")
+        ;
     //
         SubCmd* ssc_new = newSubCmd(sc_profile_, {"new", "n", "+"},
-            BIND(do_p_new(impl->v.new_prof_name, impl->v.new_repo_name, impl->v.new_repo_visb)), "Create a new profile", true, 1);
-            ssc_new->add_option("profile", impl->v.new_prof_name, "Name of the new profile")->required();
+            BIND(do_p_new(impl->v.new_prof_name, impl->v.new_repo_name, impl->v.new_repo_visb, impl->v.new_commit_msg)),
+            "Create a new profile", true, {1,0}, {0,0}
+        );
+            ssc_new->add_option("name,--name,-n", impl->v.new_prof_name, "New profile's name");
+            ssc_new->add_option("--repo,-r", impl->v.new_repo_name, "New profile's repo name");
+            ssc_new->add_option("--visibility,-v", impl->v.new_repo_visb, "New profile's repo visibility");
+            ssc_new->add_option("--commit-message,-m", impl->v.new_commit_msg, "New profile's initial commit message");
+        ;
     //
         SubCmd* ssc_delete = newSubCmd(sc_profile_, {"delete", "d", "-"},
-            BIND(do_p_delete(impl->v.delete_profile)), "Delete a profile", true, 1);
-            ssc_delete->add_option("profile", impl->v.delete_profile, "Name of the profile to delete")->required();
+            BIND(do_p_delete(impl->v.delete_profile)),
+            "Delete a profile", true, {1,1}, {0,0}
+        ); ssc_delete
+            ->add_option("profile", impl->v.delete_profile, "Name of the profile to delete")->required()
+        ;
     //
         SubCmd* ssc_switch = newSubCmd(sc_profile_, {"switch", "s", "="},
-            BIND(do_p_switch(impl->v.switch_profile)), "Switch to another profile", true, 1);
-            ssc_switch->add_option("profile", impl->v.switch_profile, "Name of the profile to switch")->required();
+            BIND(do_p_switch(impl->v.switch_profile)),
+            "Switch to another profile", true, {1,1}, {0,0}
+        ); ssc_switch
+            ->add_option("profile", impl->v.switch_profile, "Name of the profile to switch")->required()
+        ;
 
     //
     // SC sc_clean = newSubCmd("clean", BIND(do_clean(impl->v.clean_configs)), "Clean all configs for current profile", 1);

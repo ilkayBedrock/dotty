@@ -61,13 +61,13 @@ Report Cfman::prerequisite(strview init_prof) {
     Profile* profile = getProfileByName(activeProf());
 
     if (dotty.activeProf() == NO_PROFILE) {
-        Report::Bad("Active profile is not set!\n");
+        return Report::Bad("Active profile is not set!\n");
     }
 
     // Pre-create required directories
-    cm::ensure_directory(config_d/profile->name);
-    cm::ensure_directory(data_d/profile->name);
-    cm::ensure_directory(data_d/profile->name/dotty.data_cfgref);
+    cm::ensure_directories(config_d/profile->name);
+    cm::ensure_directories(data_d/profile->name);
+    cm::ensure_directories(data_d/profile->name/dotty.data_cfgref);
 
     return Report::Good();
 }
@@ -77,32 +77,36 @@ Report Cfman::prerequisite(strview init_prof) {
 // Create a folder and register a new profile
 Report Cfman::newProfile(
     const std::string& name, const std::string& github_name,
-    const std::string& repo_name, const std::string& repo_visibility
+    const std::string& repo_name, const std::string& repo_visibility,
+    const char* const initial_commit_message
 ){
     static COMPTIME_STR err = "Can't create profile";
-    // quick returns
+
+    // validate profile and repo names quickly
+    dotty.validateProfileName(name).printOnBad().terminateOnBad();
+    dotty.validateRepoName(repo_name).printOnBad().terminateOnBad();
     if (profileExists(name)) return Report::Bad("{} '{}': Profile already exists.", err, name);
-    if (fs::create_directories(config_d/name)) {
-        ;
-        if (cm::new_file(config_d/name/"config")) {
-            cm::debug("Created new config file in: ", (config_d/name/"config").string());
-        } else return Report::Bad("{} '{}': Config source couldn't be opened.", err, name);
-    } else return Report::Bad("{} '{}': Failed creating config directory tree.", err, name);
+    // create profile directory and files
+    if (!fs::create_directories(config_d/name)) return Report::Bad("Coudln't create configuration directories!");
+    if (!cm::new_file(config_d/name/"config"))  return Report::Bad("Coudln't create configuration file!");
+
+    cm::debug("Created new config file in: ", (config_d/name/"config").string());
 
     // constants
     const fs::path repo_d = cm::parsePathTilde(data_d/name);
     const fs::path config = cm::parsePathTilde(config_d/name);
 
-    cm::CmdStream cmd;
-    cmd
-        .add("mkdir -p {0}/{1} && cd {0}", repo_d.string(), data_cfgref)
+    // create data(also repository) directory and a config-reference
+    cm::ensure_directories(repo_d/data_cfgref);
+    // create and push github repo
+    cm::CmdStream {}
         .add("git init")
         .add("touch .gitkeep")
         .add("git add .gitkeep")
-        .add("git commit -m 'Dotty profile repository: Initial commit'")
+        .add("git commit -m {}", initial_commit_message)
         .add("gh repo create {} --{} --source={} --remote=origin --push",
-            repo_name, repo_visibility, repo_d.string());
-    cmd.run(" && ", false);
+            repo_name, repo_visibility, repo_d.string())
+    .run(" && ", false);
 
     cm::debug("Writing new profile configurations to master config");
     std::ofstream master(HOME/master_src, std::ios::app);
@@ -122,9 +126,10 @@ Report Cfman::newProfile(
 Report Cfman::deleteProfile(const strview profile_name) {
     if (!profileExists(profile_name)) {
         return Report::Bad("Can't delete '{}', it doesn't exist!", profile_name);
-    } else if (activeProf() == profile_name) {
-        return Report::Bad("Can't delete active profile! Switch to another profile to delete '{}'", profile_name);
     }
+    // else if (activeProf() == profile_name) {
+        // return Report::Bad("Can't delete active profile! Switch to another profile to delete '{}'", profile_name);
+    // }
 
     // read(in_master), modify and write(out_master) back
     std::ifstream master_old(HOME/master_src, std::ios::in);
@@ -298,9 +303,9 @@ void Cfman::load(bool optimistic) {
             mcparser.tokens.push_back(token);
         }
     }
-    mcparser.parse();
+    mcparser.parse().printOnBad();
     mcparser.eval();
-    mcparser.unwrap();
+    mcparser.unwrap().printOnBad();
     if (FAILED mcparser.unwrap()) cm::print("Master-Config-Parser: Unwrap: Something wrong happened\n");
 
     profiles = mcparser.profiles;
@@ -331,15 +336,19 @@ void Cfman::configToStorage() {
 
         auto dest_path = cm::parsePathTilde(data_d/activeProf())/dest;
         // NOTE: Add an explanation here
-        if (dest_path.string().back() == '/') {
+        if (dest_path.string().ends_with("/$")) {
             cm::debug("Converting '", dest_path.string(), "' to '",
                 dest_path.append(src_path.filename().string()), "'"
             );
             dest_path.append(src_path.filename().string());
         }
+        if (dest_path.string().ends_with("/")) {
+            cm::print("Skipping line: path has trailing '/'");
+            continue;
+        }
 
         // create missing and copy src->dest
-        fs::create_directories(dest_path.parent_path());
+        cm::ensure_directories(dest_path.parent_path());
         fs::copy_file(
             src_path, dest_path,
             fs::copy_options::update_existing
@@ -360,7 +369,7 @@ void Cfman::storageToSystem() {
         auto src_path = cm::parsePathTilde(data_d)/activeProf()/src;
         auto dest_path = cm::parsePathTilde(dest);
 
-        cm::ensure_directory(dest_path.parent_path());
+        cm::ensure_directories(dest_path.parent_path());
         fs::copy_file(
             src_path, dest_path,
             fs::copy_options::overwrite_existing

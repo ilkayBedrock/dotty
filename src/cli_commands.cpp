@@ -20,8 +20,8 @@ int32 CmdLine::do_init() {
     }
 
     // Create directories if not exist
-    cm::ensure_directory(dotty.config_d);
-    cm::ensure_directory(dotty.data_d);
+    cm::ensure_directories(dotty.config_d);
+    cm::ensure_directories(dotty.data_d);
 
     // Check github authentication status
     cm::print("Checking GitHub CLI authentication...\n");
@@ -67,7 +67,9 @@ int32 CmdLine::do_init() {
     fs::path repo_d = cm::parsePathTilde(dotty.data_d/ini_prof);
     fs::path config = cm::parsePathTilde(dotty.config_d/ini_prof);
 
-    dotty.newProfile(ini_prof, gh_auth_name, repo_name, visibility)
+    std::string commit_msg = "Initial commit of this configuration profile";
+    cm::prompt(std::format("Enter commit message [\"{}\"]: ", commit_msg).c_str(), commit_msg);
+    dotty.newProfile(ini_prof, gh_auth_name, repo_name, visibility, "")
         .printOnBad()
         .terminateOnBad();
     // dotty.load(true);  // newProfile loads anyways
@@ -117,7 +119,8 @@ int32 CmdLine::do_update() {
         lexer.lexMain();
         cm::print("Parsing tokens...\n");
         parser.tokens = lexer.result();
-        parser.parseMain();
+        parser.parseMain().printOnBad();
+
         cm::print("Adding new values to the base...\n");
         dotty.path_pairs = parser.result();
     }
@@ -141,8 +144,8 @@ int32 CmdLine::do_push(const char* commit_message) {
         return EXIT_FAILURE;
     }
 
-    cm::ensure_directory(dotty.config_d / dotty.activeProf());
-    cm::ensure_directory(dotty.data_d / dotty.activeProf() / dotty.data_cfgref);
+    cm::ensure_directories(dotty.config_d / dotty.activeProf());
+    cm::ensure_directories(dotty.data_d / dotty.activeProf() / dotty.data_cfgref);
     // Copy all config source and includes to local repo(config storage) before push
     fs::copy(
         dotty.config_d / dotty.activeProf(),
@@ -181,9 +184,9 @@ int32 CmdLine::do_pull() {
     std::string active_config_d = (dotty.config_d/active_prof->name).string();
     std::string active_data_d = (dotty.data_d/active_prof->name).string();
 
-    cm::ensure_directory(dotty.config_d / dotty.activeProf() / dotty.data_cfgref);
-    cm::ensure_directory(dotty.data_d / dotty.activeProf() / dotty.data_cfgref);
-    cm::ensure_directory(dotty.HOME/".cache/dotty/");
+    cm::ensure_directories(dotty.config_d / dotty.activeProf() / dotty.data_cfgref);
+    cm::ensure_directories(dotty.data_d / dotty.activeProf() / dotty.data_cfgref);
+    cm::ensure_directories(dotty.HOME/".cache/dotty/");
     cm::CmdStream {}
         .add("cd $HOME/.cache/dotty/")
         .add("rm -rf ./{}", active_prof->name)
@@ -235,34 +238,43 @@ int32 CmdLine::do_config(strview option) {
 
     dotty.load();
 
-    if (option == "") {
-        fs::path config_source = dotty.config_d/dotty.activeProf()/dotty.config_src;
-        if (!fs::exists(config_source)) {
-            cm::print("Can't find config source: ", config_source, " doesn't exist!\n");
-            return EXIT_FAILURE;
-        }
-
-        cm::CmdStream{}
-            .add("bat {}", (dotty.config_d/dotty.activeProf()/dotty.config_src).string())
-            .run(" && ", false);
-
-        return suggest_edit(dotty.config_d/dotty.activeProf()/dotty.config_src);
-    }
-
-    else if (option == "master") {
-        if (!fs::exists(dotty.HOME/dotty.master_src)) {
-            cm::print("Can't find master configuration: File doesn't exist!\n");
-            return EXIT_FAILURE;
-        }
-
-        cm::CmdStream{}.add("bat ~/.dotty").run(" && ", false);
+    // default to master if no profiles exist or active profile is not set
+    if (dotty.noProfilesExist()) {
         return suggest_edit(dotty.HOME/dotty.master_src);
     }
-
+    else if (dotty.activeProf() == dotty.NO_PROFILE) {
+        return suggest_edit(dotty.HOME/dotty.master_src);
+    }
     else
     {
-        cm::print("config: Unknown flag '", option, "'\n");
-        return EXIT_FAILURE;
+        // Default option
+        if (option == "") {
+            fs::path config_source = dotty.config_d/dotty.activeProf()/dotty.config_src;
+            if (!fs::exists(config_source)) {
+                cm::print("Can't find config source: ", config_source, " doesn't exist!\n");
+                return EXIT_FAILURE;
+            }
+            cm::CmdStream{}
+                .add("bat {}", (dotty.config_d/dotty.activeProf()/dotty.config_src).string())
+                .run(" && ", false);
+            return suggest_edit(dotty.config_d/dotty.activeProf()/dotty.config_src);
+        }
+        // Master option
+        else if (option == "master") {
+            if (!fs::exists(dotty.HOME/dotty.master_src)) {
+                cm::print("Can't find master configuration: File doesn't exist!\n");
+                return EXIT_FAILURE;
+            }
+
+            cm::CmdStream{}.add("bat ~/.dotty").run(" && ", false);
+            return suggest_edit(dotty.HOME/dotty.master_src);
+        }
+        // Unknown option
+        else
+        {
+            cm::print("config: Unknown flag '", option, "'\n");
+            return EXIT_FAILURE;
+        }
     }
 }
 
@@ -270,7 +282,7 @@ int32 CmdLine::do_config(strview option) {
 
 // This is a subcommand with subcommands(naming convention: do_<subc>_)
 int32 CmdLine::do_profile_(strview option) {
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -297,19 +309,22 @@ _print:
 
 
 int32 CmdLine::do_p_new(
-    const std::string& name, const std::string& repo_name, const std::string& visibility
+    const std::string& name, const std::string& repo_name,
+    const std::string& visibility, const std::string& commit_msg
 ){
     std::optional<std::string> gh_acc = cm::active_github_account();
     if (!gh_acc.has_value()) cm::terminate("Github login not found");
 
-    dotty.newProfile(name, cm::active_github_account().value(), repo_name, visibility);
+    dotty.newProfile(name, cm::active_github_account().value(), repo_name, visibility, commit_msg.data())
+        .printOnBad()
+        .terminateOnBad();
 
     return EXIT_SUCCESS;
 }
 
 
 
-int32 CmdLine::do_p_delete(strview profile_name) {
+int32 CmdLine::do_p_delete(const std::string& profile_name) {
     if (dotty.noProfilesExist()) {
         cm::print("Can't delete a profile: no profiles exist yet!\n");
         return EXIT_FAILURE;
@@ -353,6 +368,7 @@ int32 CmdLine::do_p_delete(strview profile_name) {
 
     return EXIT_SUCCESS;
 }
+
 
 
 int32 CmdLine::do_p_switch(const std::string& profile_name) {

@@ -4,7 +4,10 @@
 struct Token {
     enum TT {
         STRING='s',
-        REDIRECTOR='r',
+        COPIER='c',
+        LINKER='l',
+
+        DIRECTIVE='d',
 
         IDENT='a',
         EQUAL='=',
@@ -22,7 +25,7 @@ struct Lexer {
     std::vector<Token> tokens;
     static constexpr char CMNT = '#';
 
-    char get() { return line[pos]; }
+    [[nodiscard]] char get() { return line[pos]; }
     bool checks() { return line.size() > pos; }
     void step(uint n=1) { while(checks() && n--) { ++pos; } }
     void skipws() { while(checks() && get()==' ') step(); }
@@ -41,19 +44,41 @@ struct Lexer {
         return string;
     }
 
-    std::string lexRedirector() {
+    std::string lexCopier() {
         step();
         bool bad = true;
         if (get() == '>') bad = false;
 
-        if (bad) cm::terminate();
+        if (bad) cm::terminate("Failed to lex copy operator");
         else return (step(), std::string(1, '>') + '>');
+    }
+
+    std::string lexLinker() {
+        step();
+        bool bad = true;
+        if (get() == '>') bad = false;
+
+        if (bad) cm::terminate("Failed to lex link operator");
+        else return (step(), std::string(1, '-') + '>');
+    }
+
+    std::string lexDirective() {
+        std::string directive;
+        step();
+        if (!isalpha(get())) {
+            cm::terminate("lexDirective(): first character is not alpha!");
+        }
+        while (isalpha(get()) || get()=='-') {
+            directive += get();
+            step();
+        }
+        return directive;
     }
 
     std::string lexMention() {
         std::string mention;
         step();
-        if (!isalpha(get())) { // cant be path -> cant be a profile
+        if (!isalpha(get())) { // cant be a profile if starts with non-alpha
             cm::terminate("lexMention(): first character is not alpha!");
         }
         while (isalnum(get()) || get() == '.' || get() == '-') {
@@ -113,13 +138,21 @@ struct Lexer {
             line = RemoveComment(line);
             skipws();
 
-            if (get() == '"') {
+            if (get() == '#') {
+                tok.name = lexDirective();
+                tok.type = Token::DIRECTIVE;
+            }
+            else if (get() == '"') {
                 tok.name = lexString();
                 tok.type = Token::STRING;
             }
             else if (get() == '>') {
-                tok.name = lexRedirector();
-                tok.type = Token::REDIRECTOR;
+                tok.name = lexCopier();
+                tok.type = Token::COPIER;
+            }
+            else if (get() == '-') {
+                tok.name = lexLinker();
+                tok.type = Token::LINKER;
             }
             else if (get() == '@') {
                 tok.name = lexMention();
@@ -299,7 +332,6 @@ struct ConfigParser {
     bool checks() { return tokens.size() > idx; }
     void advance() { if (checks()) ++idx; }
 
-
     Report parseMain()
     {
         Report res;
@@ -311,7 +343,7 @@ struct ConfigParser {
                 std::string src = get().name;
 
                 advance();
-                if (get().type == Token::REDIRECTOR) {
+                if (get().type == Token::COPIER) {
                     ;
                     advance();
                     if (get().type == Token::STRING) {
