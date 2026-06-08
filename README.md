@@ -86,32 +86,52 @@ Example:
 ```
 
 
-### 3. Synchronizing (Writing)
+### 3. Applying configs
 
 To copy your local files into the `dotty` storage:
 
+
 ```bash
-dotty update
+dotty update # dotty u
+```
+
+Push repo to github repository which was configuired
+```bash
+dotty push
+```
+
+Pull your configs and apply to system, to get them on another machine or for rollback
+```bash
+dotty pull
+```
+
+Dotty supports multiple profiles. to create one:
+```bash
+dotty profile new terminal-configs # dotty p n terminal-configs
+```
+You can switch between them
+```bash
+dotty profile switch main # dotty p s main
+```
+
+Or you can delete them
+```bash
+dotty profile delete terminal-configs # dotty p d terminal-configs
+```
+
+You can also directly open configuration instead of the manual way
+```bash
+dotty config
 ```
 
 
-This will parse your config file and update the files in `~/.local/share/dotty/<profile-name>` based on the mappings.
-
-
-## Development
-
-
-### Header Files
-- `*.hpp`: Headers that have (or are planned to have) implementation in a corresponding `*.cpp`.
-- `*.h`: Headers that do not need a separate implementation file (templates, inline functions, constants, etc.) - exception: PCHs.
-
+# My Development Preferences and C++ conventions
 
 ### Symbols & Tokens
 - **Variables/Constants/Members**: `snake_case`
 - **Functions/Methods**: `camelCase`
 - **Classes/Typedefs**: `PascalCase`
 - **Macros / Constexprs**: `UPPER_SNAKE_CASE`
-
 
 ## Primary project files
 

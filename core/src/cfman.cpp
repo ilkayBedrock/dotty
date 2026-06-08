@@ -100,6 +100,7 @@ Report Cfman::newProfile(
     cm::ensure_directories(repo_d/data_cfgref);
     // create and push github repo
     cm::CmdStream {}
+        .add("cd {}", repo_d.string())
         .add("git init")
         .add("touch .gitkeep")
         .add("git add .gitkeep")

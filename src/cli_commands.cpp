@@ -310,12 +310,12 @@ _print:
 
 int32 CmdLine::do_p_new(
     const std::string& name, const std::string& repo_name,
-    const std::string& visibility, const std::string& commit_msg
+    bool pub, const std::string& commit_msg
 ){
     std::optional<std::string> gh_acc = cm::active_github_account();
     if (!gh_acc.has_value()) cm::terminate("Github login not found");
 
-    dotty.newProfile(name, cm::active_github_account().value(), repo_name, visibility, commit_msg.data())
+    dotty.newProfile(name, cm::active_github_account().value(), repo_name, pub?"public":"private", commit_msg.data())
         .printOnBad()
         .terminateOnBad();
 

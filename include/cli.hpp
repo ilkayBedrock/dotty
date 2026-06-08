@@ -21,7 +21,7 @@ struct CmdLine
     int32 do_config(strview options);
     int32 do_profile_(strview options);
         int32 do_p_list(const strview options);
-        int32 do_p_new(const std::string& name, const std::string& repo, const std::string& vis, const std::string& com_msg);
+        int32 do_p_new(const std::string& name, const std::string& repo, bool pub, const std::string& com_msg);
         int32 do_p_delete(const std::string& options);
         int32 do_p_switch(const std::string& profile_name);
 

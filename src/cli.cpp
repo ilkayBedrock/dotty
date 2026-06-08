@@ -18,15 +18,15 @@ struct CmdLine::Impl {
     // cache values
     struct {
         // strview clean_configs;
-        std::string push_commit_msg;
-        strview config_;
-        std::string list_properties;
-        std::string new_prof_name;
-            std::string new_repo_name;
-            std::string new_repo_visb;
-            std::string new_commit_msg;
-        std::string delete_profile;
-        std::string switch_profile;
+        std::string push_commit_msg    = {};
+        strview config_                = {};
+        std::string list_properties    = {"all"};
+        std::string new_prof_name      = {};
+            std::string new_repo_name  = {};
+            bool new_repo_pub          = {};
+            std::string new_commit_msg = {};
+        std::string delete_profile     = {};
+        std::string switch_profile     = {};
     } v;
 };
 
@@ -83,19 +83,19 @@ int32 CmdLine::setup()
         "Write configs to configs storage", false, {0,0}, {0,0}
     );
     //
-    SubCmd* sc_push = newSubCmd(&APP, {"push"},
+    SubCmd* sc_push = newSubCmd(&APP, {"push", "->"},
         BIND(do_push(impl->v.push_commit_msg.c_str())),
         "Push config storage to the github repo", false, {0,0}, {0,0}
     ); sc_push
         ->add_option("commit-message", impl->v.push_commit_msg, "Push with commit message")->required()
     ;
     //
-    SubCmd* sc_pull = newSubCmd(&APP, {"pull"},
+    SubCmd* sc_pull = newSubCmd(&APP, {"pull", "<-"},
         BIND(do_pull()),
         "Pull your config from the repo", false, {0,0}, {0,0}
     );
     //
-    SubCmd* sc_config = newSubCmd(&APP, {"config", "c", "cfg"},
+    SubCmd* sc_config = newSubCmd(&APP, {"config", "c"},
         BIND(do_config(impl->v.config_)),
         "Configuration utilities",false, {0,0}, {0,0}
     ); sc_config
@@ -107,7 +107,7 @@ int32 CmdLine::setup()
         "Profile related commands", true, {0,0}, {1, 1}
     );
     //
-        SubCmd* ssc_list = newSubCmd(sc_profile_, {"list", "l", "ls"},
+        SubCmd* ssc_list = newSubCmd(sc_profile_, {"list", "l", "/"},
             BIND(do_p_list(impl->v.list_properties)),
             "List all existing profiles", true, {0,1}, {0,0}
         ); ssc_list
@@ -115,13 +115,13 @@ int32 CmdLine::setup()
         ;
     //
         SubCmd* ssc_new = newSubCmd(sc_profile_, {"new", "n", "+"},
-            BIND(do_p_new(impl->v.new_prof_name, impl->v.new_repo_name, impl->v.new_repo_visb, impl->v.new_commit_msg)),
-            "Create a new profile", true, {1,0}, {0,0}
+            BIND(do_p_new(impl->v.new_prof_name, impl->v.new_repo_name, impl->v.new_repo_pub, impl->v.new_commit_msg)),
+            "Create a new profile", true, {3,4}, {0,0}
         );
-            ssc_new->add_option("name,--name,-n", impl->v.new_prof_name, "New profile's name");
-            ssc_new->add_option("--repo,-r", impl->v.new_repo_name, "New profile's repo name");
-            ssc_new->add_option("--visibility,-v", impl->v.new_repo_visb, "New profile's repo visibility");
-            ssc_new->add_option("--commit-message,-m", impl->v.new_commit_msg, "New profile's initial commit message");
+            ssc_new->add_option("name,--name,-n", impl->v.new_prof_name, "New profile's name")->required();
+            ssc_new->add_option("--repo,-r", impl->v.new_repo_name, "New profile's repo name")->required();
+            ssc_new->add_option("--commit-message,-m", impl->v.new_commit_msg, "New profile's initial commit message")->required();
+            ssc_new->add_flag("--public", impl->v.new_repo_pub, "New repo's publicity status");
         ;
     //
         SubCmd* ssc_delete = newSubCmd(sc_profile_, {"delete", "d", "-"},
@@ -143,7 +143,11 @@ int32 CmdLine::setup()
     //     sc_clean->add_option("config", impl->v.clean_configs, "Clean configs");
     //
 
-    CLI11_PARSE(impl->cli, impl->argc, impl->argv);
+    try {
+        impl->cli.parse(impl->argc, impl->argv);
+    } catch (const CLI::ParseError& e) {
+        std::exit(impl->cli.exit(e));
+    }
     return EXIT_SUCCESS;
 }
 #undef BIND
