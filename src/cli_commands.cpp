@@ -42,44 +42,45 @@ int32 CmdLine::do_init() {
     const std::string& gh_auth_name = get_gh_auth.output();
 
 
-    // Prompts for making the repo
+    // ASK PROFILE-NAME
+    static const std::string ini_prof_default = "main";
+    std::string ini_prof;
+    cm::prompt(std::format("Enter profile name[{}]: ", ini_prof_default).c_str(), ini_prof);
+    if (ini_prof.empty()) ini_prof = "main";
+    dotty.validateProfileName(ini_prof).printOnBad().terminateOnBad();
+
+    // ASK REPO-NAME
     std::string repo_name;
     cm::prompt("Enter a name for your dotty config repo: ", repo_name);
     dotty.validateRepoName(repo_name).printOnBad().terminateOnBad();
-
-    const std::string repo_url = {
-        std::string("https://github.com/")+gh_auth_name+"/"+repo_name  // SSO may saves us
-    };
+    const std::string repo_url = cm::make_repo_url(gh_auth_name, repo_name);
     cm::debug("URL constructed: ", repo_url);
 
-    std::string visibility;
-    cm::prompt("Repo visibility — enter 'public' or 'private' [private]: ", visibility);
-
-    if (visibility.empty()) visibility = "private";
-    if (!cm::is_any_of(visibility, {"private"s, "public"s})) {
-        cm::terminate("Invalid visibility '{}'. Must be 'public' or 'private'.", visibility);
+    // ASK REPO-VISIBILITY
+    enum class Vis { DUMMY_NONE, PRIV, PUB };
+    static const Vis visibility_default = Vis::PRIV;
+    int32 vis;
+    cm::prompt_number("Enter repo visibility (1: private, 2: public) [1]: ", vis);
+    if (!cm::is_any_of((Vis)vis, {Vis::PRIV, Vis::PUB})) {
+        cm::print("Invalid input. Defaulting to private.\n");
+        vis = (int32)visibility_default;
+    }
+    std::string visibility; switch ((Vis)vis) {
+        case Vis::PRIV: visibility = "private"; break;
+        case Vis::PUB: visibility = "public"; break;
+        case Vis::DUMMY_NONE: default: std::unreachable();
     }
 
-    std::string ini_prof;
-    cm::prompt("Enter profile name(same as profile's directory name) [main]: ", ini_prof);
-    if (ini_prof.empty()) ini_prof = "main";
-
-    dotty.validateProfileName(ini_prof).printOnBad().terminateOnBad();
-
-    // config storage
-    fs::path repo_d = cm::parsePathTilde(dotty.data_d/ini_prof);
-    fs::path config = cm::parsePathTilde(dotty.config_d/ini_prof);
-
-    // Prompt for commit message
+    // ASK COMMIT-MESSAGE
     static const std::string default_commit_msg = "\"Initial commit of this configuration profile\"";
     std::string commit_msg;
     cm::prompt(std::format("Enter commit message [{}]: ", default_commit_msg).c_str(), commit_msg);
     if (commit_msg.empty()) commit_msg = default_commit_msg;
 
+    // CREATE NEW PROFILE
     dotty.newProfile(ini_prof, gh_auth_name, repo_name, visibility, commit_msg.c_str())
         .printOnBad()
         .terminateOnBad();
-    // dotty.load(true);  // newProfile loads anyways
 
     cm::print("Repo '", repo_name, "' created as ", visibility, " on GitHub.\n");
     cm::print("Setting ", ini_prof, " active profile\n");
@@ -129,10 +130,13 @@ int32 CmdLine::do_update() {
         parser.parseMain().printOnBad();
 
         cm::print("Adding new values to the base...\n");
-        dotty.path_pairs = parser.result();
+        dotty.files_to_copy = parser.copy_files;
+        dotty.files_to_link = parser.link_files;
+        dotty.dirs_to_copy = parser.copy_dirs;
+        dotty.dirs_to_link = parser.link_dirs;
     }
     cm::print("\n\nCopying configs to their destinations...\n");
-    dotty.configToStorage();
+    dotty.systemToRepo();
     cm::print("\n\nLexed tokens:\n");
     lexer.print();
 
@@ -219,7 +223,7 @@ int32 CmdLine::do_pull() {
             fs::remove_all(item);
         }
     }
-    dotty.storageToSystem();
+    dotty.repoToSystem();
     fs::copy(
         active_config_d, fs::path(active_data_d)/dotty.data_cfgref,
         fs::copy_options::none

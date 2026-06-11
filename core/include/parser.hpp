@@ -3,16 +3,19 @@
 
 struct Token {
     enum TT {
+        // values
         STRING='s',
+        // operators
         COPIER='c',
         LINKER='l',
-
-        DIRECTIVE='d',
-
+        DIR_COPIER='C',
+        DIR_LINKER='L',
+        // punctuators
+        DIRECTIVE='#',
         IDENT='a',
         EQUAL='=',
         MENTION='@',
-
+        // sentinel
         NONE='_',
         UNKNOWN='!'
     } type;
@@ -25,6 +28,14 @@ struct Lexer {
     std::vector<Token> tokens;
     static constexpr char CMNT = '#';
 
+    struct [[nodiscard]] LexRes {
+        static constexpr strview BAD = "<lex-error>";
+        std::string str = "<no-lex>";
+        bool bad = false;
+        explicit LexRes (bool succeed) { str=BAD; bad=!succeed; }
+        explicit LexRes (const std::string& res) { str=res; bad = false; }
+    };
+
     [[nodiscard]] char get() { return line[pos]; }
     bool checks() { return line.size() > pos; }
     void step(uint n=1) { while(checks() && n--) { ++pos; } }
@@ -34,33 +45,65 @@ struct Lexer {
         step();
         std::string string;
         while (checks()) {
-            if (get() == '"') goto ret;
+            if (get() == '"') goto _ret;
             if (string.size() > 1024) cm::terminate("String length is too much!\n");
             string += get();
             step();
         }
-    ret:
+    _ret:
         step();
         return string;
     }
 
-    std::string lexCopier() {
-        step();
-        bool bad = true;
-        if (get() == '>') bad = false;
 
-        if (bad) cm::terminate("Failed to lex copy operator");
-        else return (step(), std::string(1, '>') + '>');
+    LexRes lexCopier() {
+        std::string copier = ">";
+        if (get() == '>') {
+            copier += get();
+            step();
+        } else return LexRes(false);
+        return LexRes(copier);
     }
 
-    std::string lexLinker() {
-        step();
-        bool bad = true;
-        if (get() == '>') bad = false;
-
-        if (bad) cm::terminate("Failed to lex link operator");
-        else return (step(), std::string(1, '-') + '>');
+    LexRes lexLinker() {
+        std::string linker = "-";
+        if (get() == '>') {
+            linker += get();
+            step();
+        } else return LexRes(false);
+        return LexRes(linker);
     }
+
+    LexRes lexDirCopier() {
+        std::string dir_copier = ">";
+        step();
+        if (get() == '>') {
+            dir_copier += get();
+            step();
+        } else return LexRes(false);
+        if (get() == '*') {
+            dir_copier += get();
+            step();
+        }
+        else return LexRes(false);
+        return LexRes(dir_copier);
+    }
+
+    LexRes lexDirLinker() {
+        std::string dir_copier = "-";
+        step();
+        if (get() == '>') {
+            dir_copier += get();
+            step();
+        } else return LexRes(false);
+        if (get() == '*') {
+            dir_copier += get();
+            step();
+        }
+        else return LexRes(false);
+        return LexRes(dir_copier);
+    }
+
 
     std::string lexDirective() {
         std::string directive;
@@ -146,13 +189,33 @@ struct Lexer {
                 tok.name = lexString();
                 tok.type = Token::STRING;
             }
+            // Lex COPIER && DIR_COPIER
             else if (get() == '>') {
-                tok.name = lexCopier();
-                tok.type = Token::COPIER;
+                tok.name = lexCopier().str;
+                if (tok.name == LexRes::BAD) {
+                    tok.name = lexDirCopier().str;
+                    if (tok.name == LexRes::BAD) {
+                        continue;
+                    } else {
+                        tok.type = Token::DIR_COPIER;
+                    }
+                } else {
+                    tok.type = Token::COPIER;
+                }
             }
+            // Lex LINKER && DIR_LINKER
             else if (get() == '-') {
-                tok.name = lexLinker();
-                tok.type = Token::LINKER;
+                tok.name = lexLinker().str;
+                if (tok.name == LexRes::BAD) {
+                    tok.name = lexDirLinker().str;
+                    if (tok.name == LexRes::BAD) {
+                        continue;
+                    } else {
+                        tok.type = Token::DIR_LINKER;
+                    }
+                } else {
+                    tok.type = Token::LINKER;
+                }
             }
             else if (get() == '@') {
                 tok.name = lexMention();
@@ -252,7 +315,7 @@ struct MasterConfigParser {
         COMPTIME_STR PROFILE = "profile";
             COMPTIME_STR PROFILE_ADD = ".add";
             COMPTIME_STR PROFILE_ACTIVE = ".active";
-        COMPTIME_STR MENTION = "@";
+        // COMPTIME_STR MENTION = "@";
             COMPTIME_STR MENTION_GH_ACC = ".gh-acc";
             COMPTIME_STR MENTION_REPO_URL = ".repo-url";
 
@@ -326,11 +389,23 @@ struct MasterConfigParser {
 struct ConfigParser {
     std::vector<Token> tokens;
     uint32 idx;
-    std::vector<SrcDest> path_pairs;
+    std::vector<SrcDest> copy_files;
+    std::vector<SrcDest> copy_dirs;
+    std::vector<SrcDest> link_files;
+    std::vector<SrcDest> link_dirs;
 
     Token get() { return tokens[idx]; }
     bool checks() { return tokens.size() > idx; }
     void advance() { if (checks()) ++idx; }
+
+    // Interdiamate parse function
+    void parsePaths(std::string* const src, std::string* const dest) {
+        // SRC parsing
+        *src = cm::parsePathTilde(*src);
+        // DEST parsing
+        if (dest->ends_with("/..")) { dest->replace(dest->size()-3, 3, fs::path(*src).filename()); }
+        else if (*dest == "..") { *dest = fs::path(*src).filename(); }
+    }
 
     Report parseMain()
     {
@@ -339,6 +414,9 @@ struct ConfigParser {
 
         while(checks())
         {
+            // STRING -> OP -> STRING
+            // DIRECTIVE -> IDENT
+
             if (get().type == Token::STRING) {
                 std::string src = get().name;
 
@@ -348,23 +426,60 @@ struct ConfigParser {
                     advance();
                     if (get().type == Token::STRING) {
                         std::string dest = get().name;
-
-                        path_pairs.emplace_back(SrcDest{src, dest});
+                        parsePaths(&src, &dest);
+                        copy_files.emplace_back(SrcDest{src, dest});
                     }
-                    else res.addComplain("After a REDIRECTOR token next token.type should be STRING\n");
+                    else res.addComplain("Expected STRING after COPIER operator\n");
                 }
-                else res.addComplain("After a STRING token next token.type should be REDIRECTOR\n");
+                else if (get().type == Token::LINKER) {
+                    ;
+                    advance();
+                    if (get().type == Token::STRING) {
+                        std::string dest = get().name;
+                        parsePaths(&src, &dest);
+                        link_files.emplace_back(SrcDest{src, dest});
+                    }
+                    else res.addComplain("Expected STRING after LINKER operator\n");
+                }
+                else if (get().type == Token::DIR_COPIER) {
+                    ;
+                    advance();
+                    if (get().type == Token::STRING) {
+                        std::string dest = get().name;
+                        parsePaths(&src, &dest);
+                        copy_dirs.emplace_back(SrcDest{src, dest});
+                    }
+                    else res.addComplain("Expected STRING after DIR-COPIER operator\n");
+                }
+                else if (get().type == Token::DIR_LINKER) {
+                    ;
+                    advance();
+                    if (get().type == Token::STRING) {
+                        std::string dest = get().name;
+                        parsePaths(&src, &dest);
+                        link_dirs.emplace_back(SrcDest{src, dest});
+                    }
+                    else res.addComplain("Expected STRING after DIR-LINKER operator\n");
+                }
+                else res.addComplain("Expected operator after STRING\n");
+            }  // if STRING
+
+            else if (0) {
+                ;
             }
-            else res.addComplain("First token.type should be STRING\n");
+
+            else
+            {
+                res.addComplain(
+                    "Unexpected token: {} with the type of {}",
+                    get().name, (char)get().type
+                );
+            }
 
             advance();
         }
 
         return res;
-    }
-
-    std::vector<SrcDest> result() const {
-        return path_pairs;
     }
 };
 

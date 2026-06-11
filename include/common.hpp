@@ -1,5 +1,4 @@
 #pragma once
-// NOTE: this file is a PCH (pre-compiled header)!
 #include <iostream>
 #include <vector>
 #include <map>
@@ -9,6 +8,8 @@
 #include <fstream>
 #include <functional>
 #include <sstream>
+#include <concepts>
+#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -37,6 +38,9 @@ inline std::vector<std::string> unimplemented;
 
 using namespace std::string_literals;
 namespace fs = std::filesystem;
+namespace cm {};
+
+template<typename T> concept arithmetic = std::is_arithmetic_v<T>;
 
 using int32 = int32_t;
 using uint32 = uint32_t;

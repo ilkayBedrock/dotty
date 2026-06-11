@@ -16,7 +16,10 @@ struct Cfman
     const char* data_cfgref = ".dotty.d";
     Profile current_profile = Profile{NO_PROFILE, "", "", false};
 
-    std::vector<SrcDest> path_pairs = {};
+    std::vector<SrcDest> files_to_copy = {};
+    std::vector<SrcDest> files_to_link = {};
+    std::vector<SrcDest> dirs_to_copy = {};
+    std::vector<SrcDest> dirs_to_link = {};
 
     enum class Res : uint8_t {
         OK=0,
@@ -46,8 +49,8 @@ struct Cfman
     Report cleanConfigs(bool config, bool storage);
     bool detectPreinitConfig();
     void load(bool optimistic = false);
-    void configToStorage();
-    void storageToSystem();
+    void systemToRepo();
+    void repoToSystem();
 };
 
 extern Cfman dotty;

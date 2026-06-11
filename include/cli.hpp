@@ -1,4 +1,4 @@
-#pragma oncel
+#pragma once
 #include "cfman.hpp"
 
 namespace CLI { class App; }

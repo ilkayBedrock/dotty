@@ -88,7 +88,7 @@ Report Cfman::newProfile(
     if (profileExists(name)) return Report::Bad("{} '{}': Profile already exists.", err, name);
     // create profile directory and files
     if (!fs::create_directories(config_d/name)) return Report::Bad("Coudln't create configuration directories!");
-    if (!cm::new_file(config_d/name/"config"))  return Report::Bad("Coudln't create configuration file!");
+    if (!cm::new_file(config_d/name/config_src))  return Report::Bad("Coudln't create configuration file!");
 
     cm::debug("Created new config file in: ", (config_d/name/"config").string());
 
@@ -289,8 +289,18 @@ bool Cfman::detectPreinitConfig() {
 // Load dotty configuration and debug
 void Cfman::load(bool optimistic) {
     cm::debug("dotty.load()..\n");
-    fs::path master_path = cm::parsePathTilde(HOME/master_src);
-    if (!fs::exists(master_path) && !optimistic) return;
+    std::string prof = activeProf();
+    fs::path master_path = HOME/master_src;
+
+    // Create needed directories&&files if not exist
+    if (!fs::exists(master_path)) cm::new_file(master_path);
+    cm::ensure_directories(config_d);
+    cm::ensure_directories(data_d);
+    for (auto& profile : profiles) {
+        cm::ensure_directories(config_d/profile.name);
+        if (!fs::exists(config_d/prof/config_src)) cm::new_file(config_d/prof/config_src);
+        cm::ensure_directories(data_d/profile.name/data_cfgref);
+    }
 
     cm::debug("dotty.load() -> Opening master config\n");
     std::ifstream master(master_path);
@@ -320,76 +330,127 @@ void Cfman::load(bool optimistic) {
     std::string profile = activeProf();
 
     cm::debug("Loaded dotty.\n\n");
-}
+}  // .load()
 
 
 // Copy all source files to destination files, pairs defined by a member
-void Cfman::configToStorage() {
-    for (auto [src, dest] : path_pairs) {
+void Cfman::systemToRepo() {
+    COMPTIME_STR ERR = "Skipping target: ";
+    auto should_skip = [ERR](const fs::path& src, const fs::path& dest, bool accept_dirs) ->bool {
+        bool signal_skip = false;
+        // destination should be relative to the repo
         if (dest.is_absolute()) {
             cm::print(
-                __PRETTY_FUNCTION__+5, ": Error: destination should be relative path! ",
-                "skipping..\n"
-            ); continue;
+                ERR, "destination should be relative path!\n"
+            ); signal_skip = true;
         }
-        if (fs::directory_entry(src).is_directory()) {
+        // Neither source nor destination can be written as a directory
+        else if (!accept_dirs && (
+            fs::directory_entry(src).is_directory() || fs::directory_entry(dest).is_directory()
+        )){
             cm::print(
-                __PRETTY_FUNCTION__+5, ": Error: source shouldn't be a directory! ",
-                "skipping..\n"
-            ); continue;
+                ERR, "neither source nor destination can be written as a directory!\n"
+            ); signal_skip = true;
         }
-        if (fs::directory_entry(dest).is_directory()) {
+        // Dont allow trailing '/'
+        else if (dest.string().ends_with("/")) {
             cm::print(
-                __PRETTY_FUNCTION__+5, ": Error: destination shouldn't be a directory! ",
-                "skipping..\n"
-            ); continue;
+                ERR, "path has trailing '/'"
+            ); signal_skip = true;
         }
+        // return value will signal if called should 'continue' loop
+        return signal_skip;
+    }; // lambda should_skip;
 
-        auto src_path = cm::parsePathTilde(src);
 
-        auto dest_path = cm::parsePathTilde(data_d/activeProf())/dest;
-        // NOTE: Add an explanation here
-        if (dest_path.string().ends_with("/$")) {
-            cm::debug("Converting '", dest_path.string(), "' to '",
-                dest_path.append(src_path.filename().string()), "'"
+    // COPY-FILES
+    for (auto [src, dest] : files_to_copy) {
+        if (should_skip(src, dest, false)) continue;
+        cm::ensure_directories(dest.parent_path());
+        try {
+            fs::copy_file(src, dest, fs::copy_options::update_existing);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what());
+        }
+    }
+    // LINK-FILES
+    for (auto [src, dest] : files_to_link) {
+        if (should_skip(src, dest, false)) continue;
+        cm::ensure_directories(dest.parent_path());
+        try {
+            fs::create_symlink(src, dest);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what());
+        }
+    }
+    // COPY-DIRECTORIES
+    for (auto [src, dest] : dirs_to_copy) {
+        if (should_skip(src, dest, true)) continue;
+        cm::ensure_directories(dest.parent_path());
+        try {
+            cm::copy_directory(src, dest, true);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what());
+        }
+    }
+    // LINK-DIRECTORIES
+    for (auto [src, dest] : dirs_to_link) {
+        if (should_skip(src, dest, true)) continue;
+        cm::ensure_directories(dest.parent_path());
+        try {
+            fs::create_directory_symlink(
+                src, dest
             );
-            dest_path.append(src_path.filename().string());
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what());
         }
-        if (dest_path.string().ends_with("/")) {
-            cm::print("Skipping line: path has trailing '/'");
-            continue;
-        }
-
-        // create missing and copy src->dest
-        cm::ensure_directories(dest_path.parent_path());
-        fs::copy_file(
-            src_path, dest_path,
-            fs::copy_options::update_existing
-        );
     }
 }
 
 
-void Cfman::storageToSystem() {
-    for (auto [dest, src] : path_pairs) {
-        if (src.is_absolute()) {
-            cm::print(
-                __PRETTY_FUNCTION__+5, ": Error: destination should be relative path!",
-                "skipping..\n"
-            ); continue;
+// Copy/link files/directories from repo(config storage) to their system targets
+void Cfman::repoToSystem() {
+    COMPTIME_STR ERR = "Skipping target: ";
+    // COPY-FILES
+    for (auto [src, dest] : files_to_copy) {
+        cm::ensure_directories(dest.parent_path());
+        try {
+            fs::copy_file(src, dest, fs::copy_options::overwrite_existing);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what(), "\n");
         }
-
-        auto src_path = cm::parsePathTilde(data_d)/activeProf()/src;
-        auto dest_path = cm::parsePathTilde(dest);
-
-        cm::ensure_directories(dest_path.parent_path());
-        fs::copy_file(
-            src_path, dest_path,
-            fs::copy_options::overwrite_existing
-        );
+    }
+    // LINK-FILES
+    for (auto [src, dest] : files_to_link) {
+        cm::ensure_directories(dest.parent_path());
+        try {
+            // check if dest's dereference exists or if dest is symlink
+            if (fs::exists(dest) || fs::is_symlink(dest)) fs::remove(dest);
+            fs::create_symlink(src, dest);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what(), "\n");
+        }
+    }
+    // COPY-DIRECTORIES
+    for (auto [src, dest] : dirs_to_copy) {
+        cm::ensure_directories(dest.parent_path());
+        try {
+            cm::copy_directory(src, dest, true);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what(), "\n");
+        }
+    }
+    // LINK-DIRECTORIES
+    for (auto [src, dest] : dirs_to_link) {
+        cm::ensure_directories(dest.parent_path());
+        try {
+            if (fs::exists(dest) || fs::is_symlink(dest)) fs::remove(dest);
+            fs::create_directory_symlink(src, dest);
+        } catch (const std::exception& e) {
+            cm::print(ERR, e.what(), "\n");
+        }
     }
 }
-
 
 Cfman dotty;
 

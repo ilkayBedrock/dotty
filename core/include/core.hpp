@@ -43,13 +43,16 @@ void debug(Args... args) {
 template <bool no_ansi_esc_seq=true, class T>
 inline T& prompt(const char* prompt, T& lval) {
     // Read input relevantly
-    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<char, T>)
-    {
-        if constexpr (no_ansi_esc_seq) {
+    if constexpr (std::is_same_v<char, T> || std::is_convertible_v<char, T>) {
+        if (no_ansi_esc_seq) {
             print(prompt);
-            $IMPLEMENT("no-ansi-esc-seq for arithmetics");
-        }
-        else {
+            char* raw = readline(prompt);
+            if (raw) {
+                lval = raw[0];
+                free(raw);
+            }
+            cm::print("\n");
+        } else {
             print(prompt);
             std::cin >> lval;
         }
@@ -77,6 +80,28 @@ template <bool no_ansi_esc_seq=true, class T>
 inline T& prompt(T& lval) {
     return prompt("", lval);
 }
+// for arithmetic values
+template <arithmetic T, class String>
+requires std::same_as<String, const char*>
+inline void prompt_number(const String prompt, T& number, bool no_ansi_esc_seq = true) {
+    if (!no_ansi_esc_seq) {
+        cm::print(prompt);
+        std::cin >> number;
+    }
+    else {
+        char* read_number = readline(prompt);
+        if (!read_number) return;
+
+        try {
+            number = std::stold(read_number);
+        } catch (const std::exception& e) {
+            std::cin >> number;
+        }
+
+        free(read_number);
+    }
+}
+
 
 // utility for YES/NO questions
 inline bool ask_confirm(const strview message, bool default_yes = true) {
@@ -126,7 +151,7 @@ inline std::string concats(const char* base, const char* append) {
 [[nodiscard]] inline std::string strip_nl(std::string input) {
     std::string str = std::move(input);
     str.erase(std::remove(str.begin(), str.end(), OS_NEWLN), str.end());
-    return std::move(str);
+    return str;
 }
 
 // get pair of strings, first being left of the first '.' and second being the rest
@@ -169,10 +194,17 @@ inline bool new_file(const fs::path& path) {
 }
 
 // creates directory if doesnt exist, else no-op
-inline void ensure_directories(fs::path dir_path) {
+inline void ensure_directories(const fs::path& dir_path) {
     fs::create_directories(dir_path);
 }
 
+// copy while directory without worrying about flags to pass
+inline void copy_directory(const fs::path& src_d, const fs::path& dest_d, bool cp_if_src_is_newer=false) {
+    fs::copy(src_d, dest_d,
+        fs::copy_options::recursive | (cp_if_src_is_newer?
+        fs::copy_options::update_existing : fs::copy_options::overwrite_existing
+    ));
+}
 
 // load $HOME to static constant once and return it
 inline const char* userHomePath(bool terminate_on_fail = false, const char* fail_msg="") {
@@ -231,13 +263,14 @@ inline std::pair<int32, int32> remove_dir_contents_recursive(
     return {removed_c, total_c};
 }
 
-
-inline std::string make_repo_url(const strview github_name, const strview repo_name) {
+[[nodiscard]] inline
+std::string make_repo_url(const strview github_name, const strview repo_name) {
     const std::string url = std::format("https://github.com/{}/{}", github_name, repo_name);
     return url;
 }
 
-inline std::string repo_from_url(const strview repo_url) {
+[[nodiscard]] inline
+std::string repo_from_url(const strview repo_url) {
     static constexpr const char* BAD_URL = "[BAD-URL]";
     static constexpr strview prefix = "https://github.com/";
 

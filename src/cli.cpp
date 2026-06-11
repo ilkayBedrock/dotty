@@ -68,6 +68,7 @@ CLI::App* CmdLine::newSubCmd(
 }
 
 
+#pragma GCC diagnostic ignored "-Wunused-variable"
 #define BIND(_fn_name) [this](){return _fn_name;}
 int32 CmdLine::setup()
 {
