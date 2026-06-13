@@ -268,8 +268,8 @@ inline std::pair<int32, int32> remove_dir_contents_recursive(
 
 // get system editor with nice fallbacks
 inline const char* get_sys_editor() {
-    static const char* env_editor = ::getenv("EDITOR");
     static const char* env_visual = ::getenv("VISUAL");
+    static const char* env_editor = ::getenv("EDITOR");
     static const char* text_editor = nullptr;
 
     if (text_editor == nullptr) {

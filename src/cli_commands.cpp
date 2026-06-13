@@ -273,16 +273,24 @@ int32 CmdLine::do_pull() {
 }
 
 
-
-int32 CmdLine::do_config(strview option) {
+// note: editor name is then passed to `which` command
+int32 CmdLine::do_config(strview what_cfg, const strview editor_name) {
     // prompt editing suggestion, and edit is accepted
-    auto suggest_edit = [](const fs::path cfg_path)->int32 {
+    auto suggest_edit = [editor_name](const fs::path cfg_path)->int32 {
         if (!cm::ask_confirm("Do you want to edit this file?")) {
             return EXIT_FAILURE;
         }
         else {
+            std::string editor;
+            if (!editor_name.empty()) {
+                cm::CmdStream cmd;
+                cmd.add("which {}", editor_name).run("", true);
+                editor = cmd.output();
+            } else {
+                editor = cm::get_sys_editor();
+            }
             return cm::CmdStream{}
-                .add("{} {}", cm::get_sys_editor(), cfg_path.string())
+                .add("{} {}", editor, cfg_path.string())
                 .run(" && ", false);
         }
     };
@@ -299,7 +307,7 @@ int32 CmdLine::do_config(strview option) {
     else
     {
         // Default option
-        if (option == "") {
+        if (what_cfg == "") {
             fs::path config_source = dotty.config_d/dotty.activeProf()/dotty.config_src;
             if (!fs::exists(config_source)) {
                 cm::print("Can't find config source: ", config_source, " doesn't exist!\n");
@@ -311,7 +319,7 @@ int32 CmdLine::do_config(strview option) {
             return suggest_edit(dotty.config_d/dotty.activeProf()/dotty.config_src);
         }
         // Master option
-        else if (option == "master") {
+        else if (what_cfg == "master") {
             if (!fs::exists(dotty.HOME/dotty.master_src)) {
                 cm::print("Can't find master configuration: File doesn't exist!\n");
                 return EXIT_FAILURE;
@@ -323,7 +331,7 @@ int32 CmdLine::do_config(strview option) {
         // Unknown option
         else
         {
-            cm::print("config: Unknown flag '", option, "'\n");
+            cm::print("config: Unknown flag '", what_cfg, "'\n");
             return EXIT_FAILURE;
         }
     }

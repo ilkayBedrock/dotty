@@ -19,7 +19,8 @@ struct CmdLine::Impl {
     struct {
         // strview clean_configs;
         std::string push_commit_msg    = {};
-        strview config_                = {};
+        strview config_what            = {};
+            strview config_editor      = {};
         std::string list_properties    = {"all"};
         std::string new_prof_name      = {};
             std::string new_repo_name  = {};
@@ -97,10 +98,11 @@ int32 CmdLine::setup()
     );
     //
     SubCmd* sc_config = newSubCmd(&APP, {"config", "c"},
-        BIND(do_config(impl->v.config_)),
+        BIND(do_config(impl->v.config_what, impl->v.config_editor)),
         "Configuration utilities",false, {0,0}, {0,0}
-    ); sc_config
-        ->add_option("configuration", impl->v.config_, "Configuire master")
+    );
+        sc_config->add_option("configuration", impl->v.config_what, "Which configuration to view/edit");
+        sc_config->add_option("-e,--editor", impl->v.config_editor, "Configuire with chosen editor");
     ;
     //
     SubCmd* sc_profile_ = newSubCmd(&APP, {"profile", "p"},

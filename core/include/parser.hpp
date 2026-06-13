@@ -38,7 +38,7 @@ struct Lexer {
 
     [[nodiscard]] char get() { return line[pos]; }
     bool checks() { return line.size() > pos; }
-    void step(uint n=1) { while(checks() && n--) { ++pos; } }
+    void step(uint32 n=1) { while(checks() && n--) { ++pos; } }
     void skipws() { while(checks() && get()==' ') step(); }
 
     std::string lexString() {
@@ -405,7 +405,7 @@ struct ConfigParser {
         // SRC parsing
         *src = cm::parsePathTilde(*src);
         // DEST parsing
-        if (dest->ends_with("/..")) { dest->replace(dest->size()-3, 3, fs::path(*src).filename()); }
+        if (dest->ends_with("/..")) { dest->replace(dest->size()-2, 2, fs::path(*src).filename()); }
         else if (*dest == "..") { *dest = fs::path(*src).filename(); }
     }
 

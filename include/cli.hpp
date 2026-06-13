@@ -18,7 +18,7 @@ struct CmdLine
     int32 do_update();
     int32 do_push(const char* commit_message);
     int32 do_pull();
-    int32 do_config(strview options);
+    int32 do_config(strview options, const strview editor);
     int32 do_profile_(strview options);
         int32 do_p_list(const strview options);
         int32 do_p_new(const std::string& name, const std::string& repo, bool pub, const std::string& com_msg);
