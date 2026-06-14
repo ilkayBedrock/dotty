@@ -26,4 +26,4 @@ fi
 
 xmake build -j"$JOBS" -v dotty || exit $?
 command cp "$copy_bin" ./dotty
-./dotty "$@"
+# ./dotty "$@"

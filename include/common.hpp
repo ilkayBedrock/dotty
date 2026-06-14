@@ -16,6 +16,7 @@
 #include <cstring>
 // 3rd party
 #include <readline/readline.h>
+#include <toml++/toml.hpp>
 
 #define NAMESPACE_START(_name) namespace _name {
 #define NAMESPACE_END(_name) }
@@ -26,12 +27,13 @@
 
 #if defined(__linux__) || defined(__APPLE__)
 #       define OS_NEWLN '\n'
+#       define NULLDEV   "/dev/null 2>&1"
 #elif defined(_WIN32)
 #   define OS_NEWLN '\r'
 #endif
 
 inline std::vector<std::string> unimplemented;
-// bad yes, but i need highlight for better notice(GCC/Clang specific! who cares MSVC tho)
+// bad yes, but i need highlight for better notice(GCC/Clang specific! who cares MSVC though)
 #define $IMPLEMENT(_feature) (unimplemented.push_back(std::string(std::string(__func__)+": ")+_feature), (void)"")
 #define $PRINT_UNIMPLEMENTED_FEATURES() \
     do{if(unimplemented.size())std::cerr<<"\033[33mUNIMPLEMENTED:\n"; \

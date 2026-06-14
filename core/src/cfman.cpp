@@ -25,12 +25,12 @@ Report Cfman::validateRepoName(const std::string& repo) {
 
 
 bool Cfman::noProfilesExist() {
-    return profiles.size() == 0;
+    return m_profiles.size() == 0;
 }
 
 
 bool Cfman::profileExists(const strview profile_name) {
-    for (const Profile& prof : profiles) {
+    for (const Profile& prof : m_profiles) {
         if (prof.name == profile_name) {
             return true;
         }
@@ -40,9 +40,9 @@ bool Cfman::profileExists(const strview profile_name) {
 
 
 Profile* Cfman::getProfileByName(const strview prof_name) {
-    for (uint32 i=0;  i < profiles.size();  ++i) {
-        if (profiles[i].name == prof_name) {
-            return &profiles[i];
+    for (uint32 i=0;  i < m_profiles.size();  ++i) {
+        if (m_profiles[i].name == prof_name) {
+            return &m_profiles[i];
         }
     }
     // not found
@@ -78,7 +78,7 @@ Report Cfman::prerequisite(strview init_prof) {
 Report Cfman::newProfile(
     const std::string& name, const std::string& github_name,
     const std::string& repo_name, const std::string& repo_visibility,
-    const char* const initial_commit_message
+    bool is_external, const char* const initial_commit_message
 ){
     static COMPTIME_STR err = "Can't create profile";
 
@@ -110,13 +110,13 @@ Report Cfman::newProfile(
     .run(" && ", false);
 
     cm::debug("Writing new profile configurations to master config");
-    std::ofstream master(HOME/master_src, std::ios::app);
-    master << "\n\n";
-    master << "profile.add = \"" << name << "\"\n";
-    master << "profile.active = \"" << name << "\"\n";
-    master << "@" << name << ".gh-acc = \"" << github_name << "\"\n";
-    master << "@" << name << ".repo-url = \"" << cm::make_repo_url(github_name, repo_name) << "\"\n";
-    master << "\n"; master.close();
+    MasterConfigParser master_cfman;
+    // add profile to config
+    master_cfman.wAddProfile(Profile{
+        name, github_name, repo_name, is_external
+    }).printOnBad();
+    // save
+    master_cfman.wSaveConfig(HOME/master_src).printOnBad();
 
     load(false);
     return Report::Good();
@@ -132,90 +132,50 @@ Report Cfman::deleteProfile(const strview profile_name) {
         // return Report::Bad("Can't delete active profile! Switch to another profile to delete '{}'", profile_name);
     // }
 
-    // read(in_master), modify and write(out_master) back
-    std::ifstream master_old(HOME/master_src, std::ios::in);
-    std::ofstream master_new(HOME/master_src, std::ios::trunc);
-
-    if (!master_old || !master_new) return Report::Bad("Could not open master config");
-
-    // load contents of master config to this string and close ifstream
-    master_old.close();
-
-    std::string adder = "profile.add = \"" + std::string(profile_name) + "\"";
-    std::string activator = "profile.active = \"" + std::string(profile_name) + "\"";
-    std::string mention = "@" + std::string(profile_name);
-
-    std::istringstream master_data_old(std::string{std::istreambuf_iterator(master_old), {}});
-    std::ostringstream master_data_new;
-    std::string line;
-
-    while (std::getline(master_data_old, line))
-    {
-        if (line.contains(adder)) continue;
-        if (line.contains(activator)) continue;
-        if (line.contains(mention)) continue;
-
-        master_data_new << line << "\n";
+    MasterConfigParser master_cfman;
+    if (auto report = master_cfman.wRemoveProfile(profile_name)) {
+        report.printOnBad();
+        return Report::Bad("Couldn't delete profile!");
     }
 
-    // write back
-    master_new << master_data_new.str();
     return Report::Good();
 }
 
 
 
 // Set current dotty profile
-Report Cfman::setActiveProfile(const std::string& name) {
+Report Cfman::setActiveProfile(const strview name) {
     if (noProfilesExist()) {
         return Report::Bad("Can't set active profile: No profiles exist yet!");
     }
     if (!profileExists(name)) {
         return Report::Bad("Can't switch to @{}: Profile doesn't exist!", name);
     }
-    if (current_profile.name == name.c_str()) {
+    if (current_profile.name == name.data()) {
         // return Report::Bad("profile @{} is already active", name);
         return Report::Good();
     }
 
-    // open master-config, read to string var, close master-config
-    std::ifstream master_old(dotty.HOME/dotty.master_src, std::ios::in);
-    if (!master_old) return Report::Bad("Couldn't open(write) master config, setting active profile aborted!");
-    std::istringstream master_content(std::string{std::istreambuf_iterator(master_old), {}});
-    master_old.close();
+    MasterConfigParser master_cfman;
+    if (auto report = master_cfman.wActivateProfile(name)) {
+        report.printOnBad();
+    };
+    master_cfman.wSaveConfig(HOME/master_src).printOnBad();
 
-    // open master-config, write new config
-    std::ofstream master_new(dotty.HOME/dotty.master_src, std::ios::out);
-    if (!master_new) return Report::Bad("Couldn't open(write) master config, setting active profile aborted!");
-    std::string line;
-
-    while (std::getline(master_content, line)) {
-        if (Lexer::RemoveComment(line).contains("profile.active")) {
-            continue;
-        }
-        master_new << line << "\n";
-    }
-
-    master_new << "\n";
-    master_new << "profile.active = \"" << name << "\"\n";
-    master_new << "\n";
-
-    Profile* found = getProfileByName(name);
-    current_profile = *found;
     return Report::Good();
 }
 
 
 Cfman::Res Cfman::listProfiles(bool name, bool repo, bool url, bool gh) {
-    for (uint32 i=0;  i < profiles.size();  ++i) {
-        auto prof = profiles[i];
+    for (uint32 i=0;  i < m_profiles.size();  ++i) {
+        auto prof = m_profiles[i];
 
         std::string msg;
         // TODO: make them switch-case after testing
         if(name) msg += " | " + prof.name;
         if(repo) msg += " | " + prof.repo_name;
         if(url)  msg += " | " + prof.repoUrl();
-        if(gh)   msg += " | " + prof.github_name;
+        if(gh)   msg += " | " + prof.github_host;
 
         cm::print(i+1, ": ", msg ," |\n");
     }
@@ -226,56 +186,56 @@ Cfman::Res Cfman::listProfiles(bool name, bool repo, bool url, bool gh) {
 // 1. deletes config storage
 // 2. removes master config
 // 3. removes active profile's config
-Report Cfman::cleanConfigs(bool config, bool storage) {
-    Report report;
-    fs::path target_path;
+// Report Cfman::cleanConfigs(bool config, bool storage) {
+//     Report report;
+//     fs::path target_path;
 
-    // if (master) {
-    //     target_path = HOME/master_src;
-    //     if (fs::exists(target_path)) {
-    //         cm::print(":: Resetting master config\n");
-    //         std::ofstream master_cfg(HOME/master_src, std::ios::out);  // clears file
-    //     } else {
-    //         report.addComplain("Path does not exist: {}", target_path.string());
-    //     }
-    // }
+//     if (master) {
+//         target_path = HOME/master_src;
+//         if (fs::exists(target_path)) {
+//             cm::print(":: Resetting master config\n");
+//             std::ofstream master_cfg(HOME/master_src, std::ios::out);  // clears file
+//         } else {
+//             report.addComplain("Path does not exist: {}", target_path.string());
+//         }
+//     }
 
 
-    if (noProfilesExist()) {
-        return Report::Bad("Can't clean profile configs: No profiles exist");
-    }
-    else if (activeProf() == NO_PROFILE) {
-        return Report::Bad("Can't clean profile configs: No profiles are active");
-    }
+//     if (noProfilesExist()) {
+//         return Report::Bad("Can't clean profile configs: No profiles exist");
+//     }
+//     else if (activeProf() == NO_PROFILE) {
+//         return Report::Bad("Can't clean profile configs: No profiles are active");
+//     }
 
-    if (config) {
-        target_path = config_d/activeProf();
-        if (fs::exists(target_path)) {
-            cm::print(":: Cleaning profile configs: ", target_path.string());
-            cm::remove_dir_contents_recursive(target_path, {config_src});
-            // clear config file
-            std::ofstream master_cfg(config_d/activeProf()/config_src, std::ios::out);
-        } else {
-            report.addComplain("Path does not exist: {}", target_path.string());
-        }
-    }
+//     if (config) {
+//         target_path = config_d/activeProf();
+//         if (fs::exists(target_path)) {
+//             cm::print(":: Cleaning profile configs: ", target_path.string());
+//             cm::remove_dir_contents_recursive(target_path, {config_src});
+//             // clear config file
+//             std::ofstream master_cfg(config_d/activeProf()/config_src, std::ios::out);
+//         } else {
+//             report.addComplain("Path does not exist: {}", target_path.string());
+//         }
+//     }
 
-    if (storage) {
-        target_path = data_d/activeProf();
-        if (fs::exists(target_path)) {
-            cm::print(":: Removing config storage contents: ", target_path.string());
-            std::pair ratio = cm::remove_dir_contents_recursive(target_path);
-            if (!(ratio.first == ratio.second)) {  // not all content is removed
-                report.addComplain("Removed ", ratio.first, "items out of ", ratio.second, "\n");
-            }
-            else cm::debug("All ", ratio.first, " items removed");
-        } else {
-            cm::debug("Path does not exist: ", target_path.string());
-        }
-    }
+//     if (storage) {
+//         target_path = data_d/activeProf();
+//         if (fs::exists(target_path)) {
+//             cm::print(":: Removing config storage contents: ", target_path.string());
+//             std::pair ratio = cm::remove_dir_contents_recursive(target_path);
+//             if (!(ratio.first == ratio.second)) {  // not all content is removed
+//                 report.addComplain("Removed ", ratio.first, "items out of ", ratio.second, "\n");
+//             }
+//             else cm::debug("All ", ratio.first, " items removed");
+//         } else {
+//             cm::debug("Path does not exist: ", target_path.string());
+//         }
+//     }
 
-    return report;
-}
+//     return report;
+// }
 
 
 bool Cfman::detectPreinitConfig() {
@@ -296,7 +256,7 @@ void Cfman::load(bool optimistic) {
     if (!fs::exists(master_path)) cm::new_file(master_path);
     cm::ensure_directories(config_d);
     cm::ensure_directories(data_d);
-    for (auto& profile : profiles) {
+    for (auto& profile : m_profiles) {
         cm::ensure_directories(config_d/profile.name);
         if (!fs::exists(config_d/prof/config_src)) cm::new_file(config_d/prof/config_src);
         cm::ensure_directories(data_d/profile.name/data_cfgref);
@@ -304,22 +264,11 @@ void Cfman::load(bool optimistic) {
 
     cm::debug("dotty.load() -> Opening master config\n");
     std::ifstream master(master_path);
-    Lexer lexer;
     MasterConfigParser mcparser;
-    cm::debug("Reading master-config lines..");
-    while (std::getline(master, lexer.line)) {
-        static uint32 lines = 0; ++lines;
-        lexer.lexMain();
-        for (auto& token :  lexer.result()) {
-            mcparser.tokens.push_back(token);
-        }
-    }
-    mcparser.parse().printOnBad();
-    mcparser.eval();
-    mcparser.unwrap().printOnBad();
-    if (FAILED mcparser.unwrap()) cm::print("Master-Config-Parser: Unwrap: Something wrong happened\n");
-
-    profiles = mcparser.profiles;
+    mcparser.rParse(master_path).printOnBad();
+    mcparser.rEval();
+    mcparser.rUnwrap().printOnBad();
+    m_profiles = mcparser.profiles;
 
     // set active profile based on the config
     auto it = mcparser.vars.find("profile.active");

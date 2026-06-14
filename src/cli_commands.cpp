@@ -25,7 +25,7 @@ int32 CmdLine::do_init() {
 
     // Check github authentication status
     cm::debug("Checking GitHub CLI authentication...\n");
-    int auth_status = ::system("gh auth status --hostname github.com > /dev/null 2>&1");
+    int auth_status = ::system("gh auth status --hostname github.com >" NULLDEV);
     if (FAILED auth_status) {
         cm::terminate("gh is not authenticated. Please run 'gh auth login' first.\n");
     } else {
@@ -287,7 +287,7 @@ int32 CmdLine::do_config(strview what_cfg, const strview editor_name) {
                 cmd.add("which {}", editor_name).run("", true);
                 editor = cmd.output();
             } else {
-                editor = cm::get_sys_editor();
+                editor = cm::os::get_txt_editor();
             }
             return cm::CmdStream{}
                 .add("{} {}", editor, cfg_path.string())

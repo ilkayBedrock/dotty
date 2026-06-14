@@ -43,6 +43,7 @@ set_toolchains("dotty-toolchain")
 
 --- DEPENDENCIES
 add_requires("cli11", {system = true})
+add_requires("tomlplusplus", {system = true})
 add_requires("readline", {system = true})
 --- GLOBAL
 set_languages("c++23")
@@ -53,10 +54,11 @@ target("core")
     set_kind("static")
     add_files("core/src/*.cpp")
     add_includedirs("include/", "core/include/")
+    add_packages("tomlplusplus")
 
 target("dotty")
     set_kind("binary")
     add_files("src/*.cpp")
     add_includedirs("include/", "core/include/")
     add_deps("core")
-    add_packages("cli11", "readline")
+    add_packages("cli11", "tomlplusplus", "readline")

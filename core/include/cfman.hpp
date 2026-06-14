@@ -1,5 +1,5 @@
 #pragma once
-#include "parser.hpp"
+#include "master_cfg_parser.hpp"
 
 NAMESPACE_START(cm)
 
@@ -22,6 +22,9 @@ struct Clr {
 
 NAMESPACE_END(cm)
 
+inline const char* f() {
+    return ".config";
+}
 
 class Cfman
 {
@@ -29,15 +32,15 @@ public:
     static COMPTIME_STR NO_PROFILE = "[no-profile]";
     static constexpr bool COLORS = true;
 
-    std::vector<Profile> profiles;
+    std::vector<Profile> m_profiles;
 
     const fs::path HOME = cm::userHomePath(true, "$HOME is empty");
-    fs::path config_d = HOME/".config/dotty";
+    fs::path config_d = HOME/cm::os::get_config_d()/"dotty";
     fs::path data_d = HOME/".local/share/dotty";
 
-    const char* master_src = ".dotty";
-    const char* config_src = "config";
-    const char* data_cfgref = ".dotty.d";
+    const char* const master_src = ".dotty.toml";
+    const char* const config_src = "config";
+    const char* const data_cfgref = ".dotty.d";
     Profile current_profile = Profile{NO_PROFILE, "", "", false};
 
     std::vector<SrcDest> files_to_copy = {};
@@ -84,10 +87,10 @@ public:
     Report prerequisite(strview init_prof);
     Report newProfile(const std::string& name, const std::string& github_name,
         const std::string& repo_name, const std::string& repo_visibility,
-        const char* const initial_commit_message
+        bool is_external, const char* const initial_commit_message
     );
     Report deleteProfile(const strview profile_name);
-    Report setActiveProfile(const std::string& name);
+    Report setActiveProfile(const strview name);
     Res listProfiles(bool name, bool repo, bool url, bool gh);
     Report cleanConfigs(bool config, bool storage);
     bool detectPreinitConfig();

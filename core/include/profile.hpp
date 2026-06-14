@@ -5,7 +5,7 @@ struct SrcDest { fs::path src, dest; };
 
 struct Profile {
     std::string name;
-    std::string github_name;
+    std::string github_host;
     std::string repo_name;
     bool is_external = false;
 

@@ -110,7 +110,7 @@ inline bool ask_confirm(const strview message, bool default_yes = true) {
     const char* post = default_yes?(" (Y/n): "):(" (y/N): ");
     std::string ask_msg = std::string(message).append(post);
 
-    char* inp = readline(ask_msg.c_str());
+    char* inp = ::readline(ask_msg.c_str());
     if (!inp) return(default_yes);
 
     // pass ownership and free
@@ -268,22 +268,41 @@ inline std::pair<int32, int32> remove_dir_contents_recursive(
 }
 
 
-// get system editor with nice fallbacks
-inline const char* get_sys_editor() {
-    static const char* env_visual = ::getenv("VISUAL");
-    static const char* env_editor = ::getenv("EDITOR");
-    static const char* text_editor = nullptr;
+namespace os
+{
+    // get system editor with nice fallbacks
+    inline const char* get_txt_editor() {
+        static const char* env_visual = ::getenv("VISUAL");
+        static const char* env_editor = ::getenv("EDITOR");
+        static const char* text_editor = nullptr;
+    
+        if (text_editor == nullptr) {
+            if (env_visual)  return (text_editor = env_visual);
+            if (env_editor)  return (text_editor = env_editor);
+            else if (!::system("which nano >" NULLDEV)) return (text_editor = "nano");
+            else if (!::system("which vi >" NULLDEV))   return (text_editor = "vi");
+            else return nullptr;
+        }
+        else {
+            return text_editor;
+        }
+    }
 
-    if (text_editor == nullptr) {
-        if (env_visual)  return (text_editor = env_visual);
-        if (env_editor)  return (text_editor = env_editor);
-        else if (!::system("which nano >/dev/null 2>&1")) return (text_editor = "nano");
-        else if (!::system("which vi >/dev/null 2>&1"))   return (text_editor = "vi");
-        else return nullptr;
+    // get configuration directory based on the OS
+    inline consteval const char* get_config_d() {
+    #   if defined(__linux__)
+            return "~/.config/";
+    #   elif defined(BSD) && !defined(__APPLE__)
+            return "~/.config/";
+    #   elif defined(__APPLE__)
+            return "~/Library/Preferences";
+    #   elif defined(_WIN32)
+            return "~/AppData/Roaming/";
+    #   else
+            return "~/.config/";
+    #   endif
     }
-    else {
-        return text_editor;
-    }
+
 }
 
 
@@ -345,7 +364,7 @@ inline bool internet_is_connected(uint32 timeout_seconds = 2) {
         "nc -zw%u 1.1.1.1 53 2>/dev/null||nc -z-w%u 9.9.9.9 53 2>/dev/null",
         timeout_seconds, timeout_seconds
     );
-    return !::system(cmd);
+    return ::system(cmd) == 0;
 }
 
 // void check_internet_async(std::function<void(bool)> callback) {
