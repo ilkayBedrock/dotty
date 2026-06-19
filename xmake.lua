@@ -52,7 +52,7 @@ set_pcxxheader("include/common.hpp")
 target("core")
     set_kind("static")
     add_files("core/src/*.cpp")
-    add_ldflags("-lreadline")
+    -- add_ldflags("-lreadline")
 
 target("dotty")
     set_kind("binary")

@@ -53,13 +53,13 @@ template <bool no_ansi_esc_seq=true, class T>
 inline T& prompt(const char* prompt, T& lval) {
     // Read input relevantly
     if constexpr (std::is_same_v<char, T> || std::is_convertible_v<char, T>) {
-        if (no_ansi_esc_seq) {
+        if (no_ansi_esc_seq || false) {
             print(prompt);
-            char* raw = rl::readline(prompt);
-            if (raw) {
-                lval = raw[0];
-                free(raw);
-            }
+            // char* raw = rl::readline(prompt);
+            // if (raw) {
+                // lval = raw[0];
+                // free(raw);
+            // }
             cm::print("\n");
         } else {
             print(prompt);
@@ -68,12 +68,12 @@ inline T& prompt(const char* prompt, T& lval) {
     }
     else
     {
-        if constexpr (no_ansi_esc_seq) {
-            char* raw = rl::readline(prompt);
-            if (raw) {
-                lval = raw;
-                free(raw);
-            }
+        if constexpr (no_ansi_esc_seq || false) {
+            // char* raw = rl::readline(prompt);
+            // if (raw) {
+                // lval = raw;
+                // free(raw);
+            // }
             cm::print("\n");
         }
         else {
@@ -94,22 +94,22 @@ inline T& prompt(T& lval) {
 template <arithmetic T, class String>
 requires std::same_as<String, const char*>
 inline void prompt_number(const String prompt, T& number, bool no_ansi_esc_seq = true) {
-    if (!no_ansi_esc_seq) {
+    if (!no_ansi_esc_seq || true) {
         cm::print(prompt);
         std::cin >> number;
     }
     else {
-        char* read_number = rl::readline(prompt);
-        if (!read_number || read_number[0]=='\0') return;
+        // char* read_number = rl::readline(prompt);
+        // if (!read_number || read_number[0]=='\0') return;
 
         try {
-            number = std::stold(read_number);
+            // number = std::stold(read_number);
         } catch (const std::exception& e) {
             cm::print("\n");
             return;
         }
 
-        free(read_number);
+        // free(read_number);
     }
 }
 
@@ -119,7 +119,11 @@ inline bool ask_confirm(const strview message, bool default_yes = true) {
     const char* post = default_yes?(" (Y/n): "):(" (y/N): ");
     std::string ask_msg = std::string(message).append(post);
 
-    char* inp = rl::readline(ask_msg.c_str());
+    // char* inp = rl::readline(ask_msg.c_str());
+    char* inp;
+    std::string inps;
+    std::getline(std::cin, inps);
+    inp = inps.data();
     if (!inp) return(default_yes);
 
     // pass ownership and free

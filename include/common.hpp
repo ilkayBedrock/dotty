@@ -20,7 +20,7 @@
 // 3rd party
 #include "toml++/toml.hpp"
 namespace rl {
-#   include "rl/readline.h"
+// #   include "rl/readline.h"
 }
 
 #define IGNORE(_comment)
