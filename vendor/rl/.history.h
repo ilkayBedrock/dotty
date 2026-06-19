@@ -18,9 +18,7 @@
    You should have received a copy of the GNU General Public License
    along with History.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef _HISTORY_H_
-#define _HISTORY_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -287,5 +285,3 @@ extern rl_linebuf_func_t *history_inhibit_expansion_function;
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* !_HISTORY_H_ */

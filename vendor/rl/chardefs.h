@@ -18,9 +18,7 @@
    You should have received a copy of the GNU General Public License
    along with Readline.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef _CHARDEFS_H_
-#define _CHARDEFS_H_
+#pragma once
 
 #include <ctype.h>
 
@@ -161,5 +159,3 @@
 #undef ESC
 #endif
 #define ESC CTRL('[')
-
-#endif  /* _CHARDEFS_H_ */

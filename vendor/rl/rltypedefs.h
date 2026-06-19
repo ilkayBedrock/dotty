@@ -18,9 +18,7 @@
    You should have received a copy of the GNU General Public License
    along with Readline.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef _RL_TYPEDEFS_H_
-#define _RL_TYPEDEFS_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,5 +90,3 @@ typedef char *rl_cpcppfunc_t (char  **);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _RL_TYPEDEFS_H_ */

@@ -16,6 +16,7 @@
 #include <cstring>
 #include <wait.h>
 #include <spawn.h>
+#include <unistd.h>
 // 3rd party
 #include "toml++/toml.hpp"
 namespace rl {

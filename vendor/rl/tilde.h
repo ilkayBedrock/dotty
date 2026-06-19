@@ -19,9 +19,7 @@
    You should have received a copy of the GNU General Public License
    along with Readline.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#if !defined (_TILDE_H_)
-#  define _TILDE_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,5 +62,3 @@ extern char *tilde_find_word (const char *, int, int *);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _TILDE_H_ */

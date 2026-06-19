@@ -18,9 +18,7 @@
    You should have received a copy of the GNU General Public License
    along with Readline.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#if !defined (_RL_STDC_H_)
-#define _RL_STDC_H_
+#pragma once
 
 /* Adapted from BSD /usr/include/sys/cdefs.h. */
 
@@ -41,5 +39,3 @@
 #    define __attribute__(x)
 #  endif
 #endif
-
-#endif /* !_RL_STDC_H_ */

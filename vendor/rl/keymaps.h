@@ -18,23 +18,15 @@
    You should have received a copy of the GNU General Public License
    along with Readline.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef _KEYMAPS_H_
-#define _KEYMAPS_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if !defined (READLINE_LIBRARY)
-#  include "rlstdc.h"
-#  include "chardefs.h"
-#  include "rltypedefs.h"
-#else
-#  include <readline/rlstdc.h>
-#  include <readline/chardefs.h>
-#  include <readline/rltypedefs.h>
-#endif
+#include "rlstdc.h"
+#include "chardefs.h"
+#include "rltypedefs.h"
 
 /* A keymap contains one entry for each key in the ASCII set.
    Each entry consists of a type and a pointer.
@@ -96,5 +88,3 @@ extern int rl_set_keymap_name (const char *, Keymap);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _KEYMAPS_H_ */
