@@ -7,53 +7,74 @@ VV=@
 endif
 
 CCACHE=/usr/bin/ccache
-GC=/usr/bin/go
-MXX=/usr/bin/g++
-MM=/usr/bin/gcc
-RC=/usr/bin/rustc
-AS=/usr/bin/gcc
-CU=/usr/bin/clang
 ZC=/usr/bin/zig
-CC=/usr/bin/gcc
 CXX=/usr/bin/g++
+CU=/usr/bin/clang
+RC=/usr/bin/rustc
 CS=/usr/bin/dotnet
+AS=/usr/bin/gcc
+GC=/usr/bin/go
+CC=/usr/bin/gcc
+MM=/usr/bin/gcc
+MXX=/usr/bin/g++
 
+CS=/usr/bin/dotnet
 LD=/usr/bin/g++
 ZCLD=/usr/bin/zig
-RCLD=/usr/bin/rustc
 GCLD=/usr/bin/go
-CS=/usr/bin/dotnet
-AR=/usr/bin/ar
-ZCAR=/usr/bin/zig
-RCAR=/usr/bin/rustc
-GCAR=/usr/bin/go
+RCLD=/usr/bin/rustc
 SH=/usr/bin/g++
 ZCSH=/usr/bin/zig
 RCSH=/usr/bin/rustc
+AR=/usr/bin/ar
+ZCAR=/usr/bin/zig
+GCAR=/usr/bin/go
+RCAR=/usr/bin/rustc
 
-core_AR=/usr/bin/ar
-core_CXX=/usr/bin/g++
-core_CXX=/usr/bin/g++
-core_CXX=/usr/bin/g++
 dotty_LD=/usr/bin/g++
 dotty_CXX=/usr/bin/g++
 dotty_CXX=/usr/bin/g++
 dotty_CXX=/usr/bin/g++
+core_AR=/usr/bin/ar
+core_CXX=/usr/bin/g++
+core_CXX=/usr/bin/g++
+core_CXX=/usr/bin/g++
 
+dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
+dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
+dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
+dotty_LDFLAGS=-Lbuild/linux/x86_64/debug -lcore
 core_CXXFLAGS=-O0 -std=c++23 -I build/.objs/core/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
 core_CXXFLAGS=-O0 -std=c++23 -I build/.objs/core/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
 core_CXXFLAGS=-O0 -std=c++23 -I build/.objs/core/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
 core_ARFLAGS=-cr
-dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
-dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
-dotty_CXXFLAGS=-O0 -std=c++23 -I build/.objs/dotty/linux/x86_64/debug/include/cxx -include common.hpp -Iinclude -Icore/include -Ivendor
-dotty_LDFLAGS=-Lbuild/linux/x86_64/debug -lcore -lreadline
 
-default:  core dotty
+default:  dotty core
 
-all:  core dotty
+all:  dotty core
 
-.PHONY: default all  core dotty
+.PHONY: default all  dotty core
+
+dotty: build/linux/x86_64/debug/dotty
+build/linux/x86_64/debug/dotty: build/linux/x86_64/debug/libcore.a build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o
+	@echo linking.debug dotty
+	@mkdir -p build/linux/x86_64/debug
+	$(VV)$(dotty_LD) -o build/linux/x86_64/debug/dotty build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o $(dotty_LDFLAGS)
+
+build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o: src/main.cpp
+	@echo ccache compiling.debug src/main.cpp
+	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
+	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o src/main.cpp
+
+build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o: src/cli.cpp
+	@echo ccache compiling.debug src/cli.cpp
+	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
+	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o src/cli.cpp
+
+build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o: src/cli_commands.cpp
+	@echo ccache compiling.debug src/cli_commands.cpp
+	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
+	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o src/cli_commands.cpp
 
 core: build/linux/x86_64/debug/libcore.a
 build/linux/x86_64/debug/libcore.a: build/.objs/core/linux/x86_64/debug/core/src/master_cfg_parser.cpp.o build/.objs/core/linux/x86_64/debug/core/src/config_parser.cpp.o build/.objs/core/linux/x86_64/debug/core/src/cfman.cpp.o build/.objs/core/linux/x86_64/debug/core/src/profile.cpp.o
@@ -81,28 +102,14 @@ build/.objs/core/linux/x86_64/debug/core/src/profile.cpp.o: core/src/profile.cpp
 	@mkdir -p build/.objs/core/linux/x86_64/debug/core/src
 	$(VV)$(core_CXX) -c $(core_CXXFLAGS) -o build/.objs/core/linux/x86_64/debug/core/src/profile.cpp.o core/src/profile.cpp
 
-dotty: build/linux/x86_64/debug/dotty
-build/linux/x86_64/debug/dotty: build/linux/x86_64/debug/libcore.a build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o
-	@echo linking.debug dotty
-	@mkdir -p build/linux/x86_64/debug
-	$(VV)$(dotty_LD) -o build/linux/x86_64/debug/dotty build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o $(dotty_LDFLAGS)
+clean:  clean_dotty clean_core
 
-build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o: src/main.cpp
-	@echo ccache compiling.debug src/main.cpp
-	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
-	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o src/main.cpp
-
-build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o: src/cli.cpp
-	@echo ccache compiling.debug src/cli.cpp
-	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
-	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o src/cli.cpp
-
-build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o: src/cli_commands.cpp
-	@echo ccache compiling.debug src/cli_commands.cpp
-	@mkdir -p build/.objs/dotty/linux/x86_64/debug/src
-	$(VV)$(dotty_CXX) -c $(dotty_CXXFLAGS) -o build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o src/cli_commands.cpp
-
-clean:  clean_core clean_dotty
+clean_dotty:  clean_core
+	@rm -rf build/linux/x86_64/debug/dotty
+	@rm -rf build/linux/x86_64/debug/dotty.sym
+	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o
+	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o
+	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o
 
 clean_core: 
 	@rm -rf build/linux/x86_64/debug/libcore.a
@@ -111,11 +118,4 @@ clean_core:
 	@rm -rf build/.objs/core/linux/x86_64/debug/core/src/config_parser.cpp.o
 	@rm -rf build/.objs/core/linux/x86_64/debug/core/src/cfman.cpp.o
 	@rm -rf build/.objs/core/linux/x86_64/debug/core/src/profile.cpp.o
-
-clean_dotty:  clean_core
-	@rm -rf build/linux/x86_64/debug/dotty
-	@rm -rf build/linux/x86_64/debug/dotty.sym
-	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/main.cpp.o
-	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/cli.cpp.o
-	@rm -rf build/.objs/dotty/linux/x86_64/debug/src/cli_commands.cpp.o
 
