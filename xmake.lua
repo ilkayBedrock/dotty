@@ -29,7 +29,7 @@ set_toolchains("dotty.gnu")
 --- SCRIPT-BEGIN
     if not os.isdir("deps/dotty/src") then
         os.exec("git submodule update --init")
-	fi
+    end
 
     if is_mode("debug") then
         set_optimize("none")
