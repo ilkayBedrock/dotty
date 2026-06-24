@@ -27,10 +27,6 @@ toolchain_end()
 set_toolchains("dotty.gnu")
 
 --- SCRIPT-BEGIN
-    if not os.isdir("deps/dotty/src") then
-        os.exec("git submodule update --init")
-    end
-
     if is_mode("debug") then
         set_optimize("none")
         -- set_symbols("debug")
@@ -62,6 +58,7 @@ target("core")
     add_files("core/src/*.cpp")
 
 target("dotty")
+    before_build(function(target) os.exec("git submodule update --init") end)
     set_kind("binary")
     add_files("src/*.cpp")
     add_deps("core")
