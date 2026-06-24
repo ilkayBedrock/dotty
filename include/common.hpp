@@ -17,10 +17,11 @@
 #include <wait.h>
 #include <spawn.h>
 #include <unistd.h>
-#include <termios.h>
 // 3rd party
 #include "toml++/toml.hpp"
-
+namespace rl {
+// #   include "rl/readline.h"
+}
 
 #define IGNORE(_comment)
 #define DOTTY_ATTR(_attribute) IGNORE(DOTTY##_attribute)

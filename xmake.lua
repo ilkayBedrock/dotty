@@ -45,23 +45,17 @@ add_requires("bat", {system = true})
 
 --- GLOBAL
 set_languages("c++23")
-add_includedirs("include/", "core/include/", "vendor/", "deps/")
+add_includedirs("include/", "core/include/", "vendor/")
 set_pcxxheader("include/common.hpp")
-
---- INCLUDE
-includes("deps/dotline/xmake.lua")
-
---- TEST-TARGETS
-target("input") add_files("tests/raw-input.cpp");
 
 --- TARGETS
 target("core")
     set_kind("static")
     add_files("core/src/*.cpp")
+    -- add_ldflags("-lreadline")
 
 target("dotty")
     set_kind("binary")
     add_files("src/*.cpp")
     add_deps("core")
-    add_deps("dotline")
     add_packages("cli11")
